@@ -88,35 +88,44 @@ dotnet ef database update \
 
 ## Deploy to Render
 
-The app ships a root **Dockerfile** and a **render.yaml** blueprint. Two ways to deploy:
+Live deployment: **https://twitter-clone-api-9zoz.onrender.com** (Swagger at `/swagger`).
 
-### Option A — Blueprint (recommended)
+The app ships a root **Dockerfile** and a **render.yaml** describing a single web
+service. The database is an **external free [Neon](https://neon.tech) PostgreSQL**,
+not a Render-managed one.
 
-1. Push this repo to GitHub/GitLab.
-2. In Render: **New + → Blueprint**, select the repo. Render reads `render.yaml`, which provisions:
-   - a **web service** (`twitter-clone-api`) built from the Dockerfile, and
-   - a **free managed PostgreSQL** database (`twitter-clone-db`).
-3. Render automatically injects `DATABASE_URL` from the database into the web service. Click **Apply**.
+> **Why external Postgres?** Render's managed PostgreSQL — and any Blueprint that
+> provisions one — requires a payment method on file, even on the free tier. Pointing
+> `DATABASE_URL` at a free Neon database keeps the whole deploy card-free. The app
+> doesn't care where Postgres lives; it just reads `DATABASE_URL`.
 
-### Option B — Manual
+### Deploy steps
 
-1. **New + → PostgreSQL**, create a database, and copy its **Internal Connection URL**.
-2. **New + → Web Service**, point it at this repo, and choose **Docker** as the runtime (Render auto-detects the Dockerfile).
-3. Set the environment variables below.
+1. Push this repo to GitHub.
+2. Create a free PostgreSQL database (e.g. on **Neon**) and copy its connection URL
+   (the `postgresql://…?sslmode=require` form).
+3. In Render: **New + → Web Service**, point it at this repo. Render auto-detects the
+   Dockerfile (runtime: **Docker**). Choose the **Free** instance type and branch `main`.
 4. Set the **Health Check Path** to `/health`.
-5. Deploy.
+5. Add the environment variables below (`DATABASE_URL` = your Neon URL).
+6. **Create Web Service.** Pushes to `main` then auto-deploy.
+
+`render.yaml` mirrors this setup: it declares only the web service and leaves
+`DATABASE_URL` as `sync: false` (entered in the dashboard, never committed). You can
+also deploy it via **New + → Blueprint**, but you'll still supply `DATABASE_URL` yourself.
 
 ### Environment variables
 
 | Variable                 | Required | Description                                                                                                  |
 | ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`           | Yes (on Render) | PostgreSQL connection URL, e.g. `postgres://user:pass@host:5432/twitterclone`. Render supplies this from the managed DB. Takes precedence over `ConnectionStrings__DefaultConnection`. |
+| `DATABASE_URL`           | Yes (on Render) | PostgreSQL connection URL, e.g. `postgresql://user:pass@host/twitterclone?sslmode=require`. Set it to your external (Neon) database. Takes precedence over `ConnectionStrings__DefaultConnection`. |
 | `ASPNETCORE_ENVIRONMENT` | No       | `Production` on Render; `Development` locally. Swagger is enabled in all environments.                        |
 | `PORT`                   | No       | Injected by Render; the app binds to it automatically. Defaults to `8080` in the container.                  |
 
 > Notes
-> - On startup the app runs `Database.Migrate()`, so the Render database schema is created on first boot — no manual migration step needed.
-> - `DATABASE_URL` may be either a `postgres://…` URI (as Render provides) or a standard Npgsql connection string; both are handled. Render's managed Postgres requires SSL, which the app sets automatically when parsing the URI.
+> - On startup the app runs `Database.Migrate()`, so the database schema is created on first boot — no manual migration step needed.
+> - `DATABASE_URL` may be either a `postgres://…` / `postgresql://…` URI or a standard Npgsql connection string; both are handled. URI values are forced to SSL (which Neon requires).
+> - The Free instance sleeps after ~15 min idle and cold-starts in ~15–30s on the next request — expected, not a bug.
 
 ## Project layout
 

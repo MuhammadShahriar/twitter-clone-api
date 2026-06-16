@@ -1,0 +1,29 @@
+@TwitterClone.Api_HostAddress = http://localhost:5220
+
+### Health check
+GET {{TwitterClone.Api_HostAddress}}/health
+Accept: application/json
+
+### List tweets (newest first)
+GET {{TwitterClone.Api_HostAddress}}/api/tweets
+Accept: application/json
+
+### Create a tweet
+POST {{TwitterClone.Api_HostAddress}}/api/tweets
+Content-Type: application/json
+
+{
+  "content": "Hello from the walking skeleton!",
+  "authorHandle": "@claude"
+}
+
+### Create a tweet that fails validation (empty content)
+POST {{TwitterClone.Api_HostAddress}}/api/tweets
+Content-Type: application/json
+
+{
+  "content": "",
+  "authorHandle": "@claude"
+}
+
+###

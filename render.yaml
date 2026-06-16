@@ -1,0 +1,22 @@
+# Render Blueprint — provisions the API and a managed PostgreSQL database.
+# Deploy by pointing Render at this repo (New + > Blueprint) or wiring it up manually
+# per the README. The web service builds from the Dockerfile at the repo root.
+services:
+  - type: web
+    name: twitter-clone-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      # Pull the connection URL straight from the managed database below.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: twitter-clone-db
+          property: connectionString
+
+databases:
+  - name: twitter-clone-db
+    databaseName: twitterclone
+    plan: free

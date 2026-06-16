@@ -1,0 +1,37 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / VS Code
+.vscode/
+
+# .NET
+project.lock.json
+project.assets.json
+*.nuget.props
+*.nuget.targets
+
+# Test results
+[Tt]est[Rr]esults/
+*.trx
+
+# Local secrets / environment
+*.env
+.env
+appsettings.*.local.json
+
+# OS
+.DS_Store
+Thumbs.db

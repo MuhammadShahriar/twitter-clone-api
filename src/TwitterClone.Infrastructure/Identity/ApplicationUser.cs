@@ -1,0 +1,31 @@
+using Microsoft.AspNetCore.Identity;
+
+namespace TwitterClone.Infrastructure.Identity;
+
+/// <summary>
+/// The application user. Extends ASP.NET Core Identity's <see cref="IdentityUser{TKey}"/> with a
+/// <see cref="Guid"/> key — so <c>AspNetUsers.Id</c> maps to native <c>uuid</c>, consistent with the
+/// domain's <c>Tweet.Id</c> — plus the username / email / password-hash / security-stamp machinery and
+/// the Twitter-clone profile fields.
+///
+/// Identity is an INFRASTRUCTURE / persistence concern, so this type lives in the Infrastructure layer
+/// and never leaks into Domain or Application; those layers carry no reference to any Identity package.
+/// Domain entities (e.g. <c>Tweet</c>) refer to an author by a value (handle/id), not by this type.
+/// </summary>
+public class ApplicationUser : IdentityUser<Guid>
+{
+    public const int MaxHandleLength = 50;
+    public const int MaxDisplayNameLength = 100;
+    public const int MaxBioLength = 280;
+
+    /// <summary>The public @handle, unique across all users. Distinct from Identity's UserName.</summary>
+    public string Handle { get; set; } = string.Empty;
+
+    /// <summary>The display name shown on the user's profile and tweets.</summary>
+    public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>Optional short profile bio.</summary>
+    public string? Bio { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+}

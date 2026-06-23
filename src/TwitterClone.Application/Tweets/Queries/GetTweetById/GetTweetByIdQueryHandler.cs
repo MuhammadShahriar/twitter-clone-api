@@ -4,12 +4,10 @@ using TwitterClone.Application.Tweets;
 
 namespace TwitterClone.Application.Tweets.Queries.GetTweetById;
 
-public class GetTweetByIdQueryHandler(ITweetRepository tweetRepository)
+public class GetTweetByIdQueryHandler(ITweetRepository tweetRepository, ICurrentUserService currentUser)
     : IRequestHandler<GetTweetByIdQuery, TweetDto?>
 {
-    public async Task<TweetDto?> Handle(GetTweetByIdQuery request, CancellationToken cancellationToken)
-    {
-        var tweet = await tweetRepository.GetByIdAsync(request.Id, cancellationToken);
-        return tweet is null ? null : TweetDto.FromEntity(tweet);
-    }
+    public async Task<TweetDto?> Handle(GetTweetByIdQuery request, CancellationToken cancellationToken) =>
+        // Public read; currentUser.UserId is null for an anonymous reader (flags come back false).
+        await tweetRepository.GetByIdWithAuthorAsync(request.Id, currentUser.UserId, cancellationToken);
 }

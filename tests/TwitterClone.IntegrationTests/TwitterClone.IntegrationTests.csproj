@@ -11,6 +11,12 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.1" />
+    <!-- Relational provider used by a couple of repository tests. SQLite (in-memory) is relational, so it
+         catches LINQ-to-SQL translation failures the non-relational in-memory provider silently passes. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.1" />
+    <!-- Override the native SQLite bundle the provider pulls transitively (lib.e_sqlite3 2.1.11 carries a
+         known advisory, NU1903) with the patched 3.x bundle. Test-only dependency. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">

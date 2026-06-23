@@ -17,3 +17,20 @@ services:
       # the dashboard. sync:false keeps the secret out of git.
       - key: DATABASE_URL
         sync: false
+      # JWT signing key (Modules 1B+). The app fail-fast validates this at startup:
+      # must be >= 32 bytes (256-bit). Use a DIFFERENT value than local dev. sync:false.
+      - key: Jwt__SecretKey
+        sync: false
+      # Cloudinary credentials (Module 2D image upload). All three are fail-fast
+      # validated at startup; ApiSecret is the sensitive one. sync:false (entered in dashboard).
+      - key: Cloudinary__CloudName
+        sync: false
+      - key: Cloudinary__ApiKey
+        sync: false
+      - key: Cloudinary__ApiSecret
+        sync: false
+      # CORS (Module 1C+). Set AFTER the frontend (Vercel) deploy to the SPA's origin,
+      # e.g. Cors__AllowedOrigins__0 = https://<your-app>.vercel.app. Without it, browser
+      # (cross-origin) calls are blocked — server-to-server / Postman smoke tests still work.
+      # - key: Cors__AllowedOrigins__0
+      #   sync: false

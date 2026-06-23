@@ -4,21 +4,41 @@ using TwitterClone.Domain.Entities;
 
 namespace TwitterClone.Application.Tweets.Commands.CreateTweet;
 
-public class CreateTweetCommandHandler(ITweetRepository tweetRepository, IUnitOfWork unitOfWork)
+public class CreateTweetCommandHandler(
+    ITweetRepository tweetRepository,
+    IUnitOfWork unitOfWork,
+    ICurrentUserService currentUser,
+    IImageStorageService imageStorage)
     : IRequestHandler<CreateTweetCommand, TweetDto>
 {
     public async Task<TweetDto> Handle(CreateTweetCommand request, CancellationToken cancellationToken)
     {
-        var tweet = new Tweet
-        {
-            Content = request.Content.Trim(),
-            AuthorHandle = request.AuthorHandle.Trim(),
-        };
+        // The author is the authenticated caller. The controller's [Authorize] guarantees a user is
+        // present; this guard is defensive in case the handler is ever invoked outside that pipeline.
+        var authorId = currentUser.UserId
+            ?? throw new UnauthorizedAccessException("Cannot create a tweet without an authenticated user.");
 
-        // The repository only stages the insert; the unit of work commits it.
+        var tweet = new Tweet(request.Content.Trim(), authorId, request.ParentId);
+
+        // Backend-proxied upload: push each attached image to the image host (the secret stays server-side)
+        // and record the returned URL/publicId on the tweet, preserving attachment order. Validation has
+        // already capped the count/size/type, so nothing invalid reaches the host.
+        if (request.Images is { Count: > 0 })
+        {
+            foreach (var image in request.Images)
+            {
+                var uploaded = await imageStorage.UploadAsync(image, cancellationToken);
+                tweet.AddMedia(uploaded.Url, uploaded.PublicId);
+            }
+        }
+
+        // The repository only stages the insert (tweet + its media); the unit of work commits it.
         await tweetRepository.AddAsync(tweet, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return TweetDto.FromEntity(tweet);
+        // Re-read through the author join so the response carries the handle/display name (and the
+        // zeroed engagement counts/flags). The author is the caller, so pass their id for the flags.
+        var dto = await tweetRepository.GetByIdWithAuthorAsync(tweet.Id, authorId, cancellationToken);
+        return dto!;
     }
 }

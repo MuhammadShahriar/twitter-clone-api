@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TwitterClone.Api.Common;
 using TwitterClone.Application;
+using TwitterClone.Application.Common.Interfaces;
 using TwitterClone.Infrastructure;
 using TwitterClone.Infrastructure.Persistence;
 
@@ -21,7 +22,36 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// JWT bearer authentication (Module 1C-i): validates tokens issued by JwtTokenGenerator.
+// The HTTP-aware ICurrentUserService implementation lives in the API layer.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddJwtBearerAuthentication();
+
+// Refresh-token cookie settings (Module 1C-ii) — bound here because cookie handling is an API concern.
+builder.Services.Configure<AuthCookieSettings>(builder.Configuration.GetSection(AuthCookieSettings.SectionName));
+
+// CORS: origins are config-driven (Cors:AllowedOrigins) so dev and prod stay
+// separate. Dev origins live in appsettings.Development.json; prod origins are
+// supplied by Render env vars (e.g. Cors__AllowedOrigins__0). Nothing is hardcoded.
+const string CorsPolicy = "ConfiguredOrigins";
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(CorsPolicy, policy =>
+        policy.WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            // AllowCredentials is required for the browser to send/receive the refresh-token cookie
+            // cross-site. It is incompatible with AllowAnyOrigin, hence the explicit origin list above.
+            .AllowCredentials());
+});
+
+// Exception handlers are tried in registration order; each ignores exceptions that aren't its type.
 builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
+builder.Services.AddExceptionHandler<AccountLockedExceptionHandler>();
+builder.Services.AddExceptionHandler<NotFoundExceptionHandler>();
+builder.Services.AddExceptionHandler<ForbiddenAccessExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 var app = builder.Build();
@@ -43,6 +73,13 @@ app.UseExceptionHandler();
 // Swagger is enabled in all environments so the deployed skeleton is explorable.
 app.UseSwagger();
 app.UseSwaggerUI();
+
+app.UseCors(CorsPolicy);
+
+// CORS runs first (so preflight/headers are handled), then authentication populates the
+// principal, then authorization enforces [Authorize] — all before the endpoints run.
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

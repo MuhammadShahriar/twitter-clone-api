@@ -37,6 +37,19 @@ public interface ITweetRepository : IRepository<Tweet>
     /// </summary>
     Task<CursorPage<TweetDto>> GetFollowingFeedAsync(Guid currentUserId, string? cursor, int limit, CancellationToken ct = default);
 
+    /// <summary>
+    /// A user's own timeline: the <b>top-level tweets they authored</b> (<c>ParentId == null</c>),
+    /// newest-first, cursor-paginated like the main feed. <paramref name="currentUserId"/> drives the
+    /// caller's like/retweet flags (<c>null</c> ⇒ false for an anonymous reader).
+    /// </summary>
+    Task<CursorPage<TweetDto>> GetUserTweetsAsync(Guid authorId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default);
+
+    /// <summary>
+    /// The tweets a user has <b>liked</b>, most-recently-liked first (keyset on the like's time then tweet id),
+    /// cursor-paginated. <paramref name="currentUserId"/> drives the caller's like/retweet flags on each tweet.
+    /// </summary>
+    Task<CursorPage<TweetDto>> GetUserLikedTweetsAsync(Guid likerId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default);
+
     /// <summary>Fetches a single tweet (with author info, counts, and the caller's flags) by id, or <c>null</c> if it does not exist.</summary>
     Task<TweetDto?> GetByIdWithAuthorAsync(Guid id, Guid? currentUserId, CancellationToken ct = default);
 

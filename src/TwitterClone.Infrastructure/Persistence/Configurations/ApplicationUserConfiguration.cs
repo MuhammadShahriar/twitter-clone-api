@@ -17,8 +17,13 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
             .IsRequired()
             .HasMaxLength(ApplicationUser.MaxHandleLength);
 
-        // The @handle is the user's unique public identifier.
-        builder.HasIndex(u => u.Handle).IsUnique();
+        builder.Property(u => u.NormalizedHandle)
+            .IsRequired()
+            .HasMaxLength(ApplicationUser.MaxHandleLength);
+
+        // The normalized @handle is the user's unique public identifier — uniqueness (and every handle
+        // lookup) runs on the canonical form, so handles are unique case-insensitively.
+        builder.HasIndex(u => u.NormalizedHandle).IsUnique();
 
         builder.Property(u => u.DisplayName)
             .IsRequired()
@@ -26,6 +31,9 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
 
         builder.Property(u => u.Bio)
             .HasMaxLength(ApplicationUser.MaxBioLength);
+
+        builder.Property(u => u.AvatarUrl)
+            .HasMaxLength(ApplicationUser.MaxAvatarUrlLength);
 
         builder.Property(u => u.CreatedAtUtc)
             .IsRequired();

@@ -17,17 +17,37 @@ public interface IIdentityService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Validates an email/password pair. Returns <see cref="CredentialValidationStatus.Success"/> with the
-    /// user when valid, <see cref="CredentialValidationStatus.InvalidCredentials"/> when not (deliberately
-    /// not distinguishing "no such user" from "wrong password"), or
-    /// <see cref="CredentialValidationStatus.LockedOut"/> when the account is locked after too many failed
-    /// attempts. Failed attempts count toward lockout.
+    /// Validates an identifier/password pair, where the identifier is the user's email <em>or</em> their
+    /// @handle (resolved case-insensitively, leading @ optional). Returns
+    /// <see cref="CredentialValidationStatus.Success"/> with the user when valid,
+    /// <see cref="CredentialValidationStatus.InvalidCredentials"/> when not (deliberately not distinguishing
+    /// "no such user" from "wrong password"), or <see cref="CredentialValidationStatus.LockedOut"/> when the
+    /// account is locked after too many failed attempts. Failed attempts count toward lockout.
     /// </summary>
     Task<CredentialValidationResult> ValidateCredentialsAsync(
-        string email,
+        string identifier,
         string password,
         CancellationToken cancellationToken = default);
 
     /// <summary>Looks up a user by id, or <c>null</c> if no such user exists.</summary>
     Task<AuthUser?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates the user's editable profile fields (display name and bio). Returns the updated user, or
+    /// <c>null</c> if no such user exists.
+    /// </summary>
+    Task<AuthUser?> UpdateProfileAsync(
+        Guid userId,
+        string displayName,
+        string? bio,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sets the user's avatar to the given hosted image URL. Returns the updated user, or <c>null</c> if no
+    /// such user exists.
+    /// </summary>
+    Task<AuthUser?> UpdateAvatarAsync(
+        Guid userId,
+        string avatarUrl,
+        CancellationToken cancellationToken = default);
 }

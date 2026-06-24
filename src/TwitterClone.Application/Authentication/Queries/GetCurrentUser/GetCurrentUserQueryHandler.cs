@@ -19,6 +19,6 @@ public class GetCurrentUserQueryHandler(ICurrentUserService currentUser, IIdenti
 
         return user is null
             ? null
-            : new CurrentUserDto(user.Id, user.Email, user.Handle, user.DisplayName);
+            : new CurrentUserDto(user.Id, user.Email, user.Handle, user.DisplayName, user.AvatarUrl);
     }
 }

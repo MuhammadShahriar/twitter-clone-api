@@ -157,6 +157,49 @@ public class AuthApiTests : IClassFixture<TestWebAppFactory>
         Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
     }
 
+    [Theory]
+    [InlineData("@loginhandle")] // exactly as registered
+    [InlineData("loginhandle")]  // no leading @
+    [InlineData("@LOGINHANDLE")] // different casing
+    [InlineData("LoGiNhAnDlE")]  // different casing, no @
+    public async Task Login_with_handle_in_any_casing_or_at_form_succeeds(string identifier)
+    {
+        var client = _factory.CreateClient();
+
+        const string password = "P@ssw0rd!";
+        // Registered once; later theory iterations get a (harmless, unchecked) duplicate-handle 400.
+        await client.PostAsJsonAsync(
+            "/api/auth/register",
+            new { email = "loginhandle@example.com", handle = "@loginhandle", displayName = "Login Handle", password });
+
+        // The login form sends the typed value in the same `email` field — here a handle, not an email.
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email = identifier, password });
+
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+        var auth = await loginResponse.Content.ReadFromJsonAsync<LoginBody>();
+        Assert.NotNull(auth);
+        Assert.Equal("@loginhandle", auth!.Handle); // display handle preserved exactly as registered
+    }
+
+    [Fact]
+    public async Task Registering_a_handle_that_differs_only_in_casing_returns_400()
+    {
+        var client = _factory.CreateClient();
+
+        var first = await client.PostAsJsonAsync(
+            "/api/auth/register",
+            new { email = "first-casing@example.com", handle = "@Casing", displayName = "First", password = "P@ssw0rd!" });
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        // Same handle, different casing -> rejected by the normalized unique check as a clean 400.
+        var second = await client.PostAsJsonAsync(
+            "/api/auth/register",
+            new { email = "second-casing@example.com", handle = "@casing", displayName = "Second", password = "P@ssw0rd!" });
+        Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
+    }
+
     [Fact]
     public void Startup_fails_fast_when_jwt_secret_is_too_short()
     {

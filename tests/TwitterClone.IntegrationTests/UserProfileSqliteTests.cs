@@ -56,6 +56,11 @@ public class UserProfileSqliteTests
         Assert.Equal(3, asAnon!.FollowerCount);
         Assert.False(asAnon.IsFollowedByCurrentUser);
 
+        // Handle lookup is case-insensitive and @-tolerant (matches on the normalized column): the seeded
+        // "@target" resolves whether queried with different casing or without the leading @.
+        Assert.NotNull(await repository.GetByHandleAsync("@TARGET", viewer));
+        Assert.NotNull(await repository.GetByHandleAsync("Target", viewer));
+
         // Unknown handle => null.
         Assert.Null(await repository.GetByHandleAsync("@nobody", viewer));
     }

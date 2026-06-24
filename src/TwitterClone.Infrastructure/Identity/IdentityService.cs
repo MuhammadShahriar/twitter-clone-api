@@ -21,6 +21,15 @@ public class IdentityService(UserManager<ApplicationUser> userManager) : IIdenti
     private static readonly string DummyPasswordHash =
         DummyHasher.HashPassword(DummyUser, "timing-equalizer-not-a-real-password-1!");
 
+    // "Real email shape": an @ that isn't first, with a dot somewhere after it (a domain). Handles can't
+    // satisfy this (the register regex forbids dots), and an @-prefixed handle has its @ at index 0 — so
+    // this cleanly routes "ada@x.com" to the email lookup and "@ada"/"ada" to the handle lookup.
+    private static bool LooksLikeEmail(string value)
+    {
+        var at = value.IndexOf('@');
+        return at > 0 && value.IndexOf('.', at) > at + 1;
+    }
+
     public async Task<CreateUserResult> CreateUserAsync(
         string email,
         string handle,
@@ -29,9 +38,11 @@ public class IdentityService(UserManager<ApplicationUser> userManager) : IIdenti
         CancellationToken cancellationToken = default)
     {
         // Handle uniqueness is enforced only by our unique index (it is not Identity's UserName), so
-        // check it up front to return a friendly message instead of a raw DB constraint violation.
+        // check it up front to return a friendly message instead of a raw DB constraint violation. The
+        // check runs on the normalized form, so a casing/@-only variant of an existing handle is rejected.
+        var normalizedHandle = HandleNormalizer.Normalize(handle);
         var handleTaken = await userManager.Users
-            .AnyAsync(u => u.Handle == handle, cancellationToken);
+            .AnyAsync(u => u.NormalizedHandle == normalizedHandle, cancellationToken);
 
         if (handleTaken)
         {
@@ -43,6 +54,7 @@ public class IdentityService(UserManager<ApplicationUser> userManager) : IIdenti
             UserName = email,
             Email = email,
             Handle = handle,
+            NormalizedHandle = normalizedHandle,
             DisplayName = displayName,
         };
 
@@ -64,11 +76,24 @@ public class IdentityService(UserManager<ApplicationUser> userManager) : IIdenti
     }
 
     public async Task<CredentialValidationResult> ValidateCredentialsAsync(
-        string email,
+        string identifier,
         string password,
         CancellationToken cancellationToken = default)
     {
-        var user = await userManager.FindByEmailAsync(email);
+        // Twitter-style: the identifier may be an email or an @handle. Treat it as an email only when it
+        // has real email shape (an @ with a dot in the part after it); otherwise resolve it as a handle
+        // (case-insensitive, leading @ optional) via the normalized column.
+        ApplicationUser? user;
+        if (LooksLikeEmail(identifier))
+        {
+            user = await userManager.FindByEmailAsync(identifier);
+        }
+        else
+        {
+            var normalizedHandle = HandleNormalizer.Normalize(identifier);
+            user = await userManager.Users
+                .FirstOrDefaultAsync(u => u.NormalizedHandle == normalizedHandle, cancellationToken);
+        }
 
         if (user is null)
         {
@@ -90,7 +115,7 @@ public class IdentityService(UserManager<ApplicationUser> userManager) : IIdenti
             // Successful login clears any accumulated failed-attempt count.
             await userManager.ResetAccessFailedCountAsync(user);
             return CredentialValidationResult.Success(
-                new AuthUser(user.Id, user.Email!, user.Handle, user.DisplayName));
+                new AuthUser(user.Id, user.Email!, user.Handle, user.DisplayName, user.AvatarUrl));
         }
 
         // Wrong password: count the failure; if it crosses the threshold the account is now locked.
@@ -106,6 +131,56 @@ public class IdentityService(UserManager<ApplicationUser> userManager) : IIdenti
 
         return user is null
             ? null
-            : new AuthUser(user.Id, user.Email!, user.Handle, user.DisplayName);
+            : new AuthUser(user.Id, user.Email!, user.Handle, user.DisplayName, user.AvatarUrl);
+    }
+
+    public async Task<AuthUser?> UpdateProfileAsync(
+        Guid userId,
+        string displayName,
+        string? bio,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return null;
+        }
+
+        user.DisplayName = displayName;
+        user.Bio = bio;
+
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            // The fields are length-validated upstream, so a failure here is unexpected; surface it rather
+            // than silently swallowing it.
+            throw new InvalidOperationException(
+                $"Failed to update profile: {string.Join("; ", result.Errors.Select(e => e.Description))}");
+        }
+
+        return new AuthUser(user.Id, user.Email!, user.Handle, user.DisplayName, user.AvatarUrl);
+    }
+
+    public async Task<AuthUser?> UpdateAvatarAsync(
+        Guid userId,
+        string avatarUrl,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return null;
+        }
+
+        user.AvatarUrl = avatarUrl;
+
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"Failed to update avatar: {string.Join("; ", result.Errors.Select(e => e.Description))}");
+        }
+
+        return new AuthUser(user.Id, user.Email!, user.Handle, user.DisplayName, user.AvatarUrl);
     }
 }

@@ -17,15 +17,26 @@ public class ApplicationUser : IdentityUser<Guid>
     public const int MaxHandleLength = 50;
     public const int MaxDisplayNameLength = 100;
     public const int MaxBioLength = 280;
+    public const int MaxAvatarUrlLength = 500;
 
-    /// <summary>The public @handle, unique across all users. Distinct from Identity's UserName.</summary>
+    /// <summary>The public @handle as the user typed it (case + any leading @ preserved). Shown in the UI.</summary>
     public string Handle { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The canonical form of <see cref="Handle"/> (see <see cref="HandleNormalizer"/>) — upper-cased, no
+    /// leading @. This column carries the unique index and is what every handle lookup compares against, so
+    /// handles are matched case-insensitively (<c>@Ada</c> == <c>ada</c>). Set whenever <see cref="Handle"/> is.
+    /// </summary>
+    public string NormalizedHandle { get; set; } = string.Empty;
 
     /// <summary>The display name shown on the user's profile and tweets.</summary>
     public string DisplayName { get; set; } = string.Empty;
 
     /// <summary>Optional short profile bio.</summary>
     public string? Bio { get; set; }
+
+    /// <summary>Optional URL of the user's avatar image (hosted on the image provider). Null ⇒ placeholder.</summary>
+    public string? AvatarUrl { get; set; }
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 }

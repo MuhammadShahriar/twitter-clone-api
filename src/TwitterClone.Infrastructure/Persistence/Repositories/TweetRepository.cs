@@ -161,6 +161,81 @@ public class TweetRepository(ApplicationDbContext context)
         return new CursorPage<TweetDto>(items, nextCursor);
     }
 
+    public async Task<CursorPage<TweetDto>> GetUserTweetsAsync(
+        Guid authorId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default)
+    {
+        var position = TweetCursor.Decode(cursor);
+
+        // A profile's "Tweets" tab: top-level tweets the user authored, newest-first (same keyset as the
+        // main feed — (CreatedAtUtc, Id) descending, Id the stable tiebreaker).
+        var query = Context.Tweets.AsNoTracking()
+            .Where(t => t.ParentId == null && t.AuthorId == authorId);
+        if (position is not null)
+        {
+            query = query.Where(t =>
+                t.CreatedAtUtc < position.CreatedAtUtc
+                || (t.CreatedAtUtc == position.CreatedAtUtc && t.Id.CompareTo(position.Id) < 0));
+        }
+
+        var rows = await Project(query
+                .OrderByDescending(t => t.CreatedAtUtc)
+                .ThenByDescending(t => t.Id), currentUserId)
+            .Take(limit + 1)
+            .ToListAsync(ct);
+
+        return ToPage(rows, limit);
+    }
+
+    public async Task<CursorPage<TweetDto>> GetUserLikedTweetsAsync(
+        Guid likerId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default)
+    {
+        var position = TweetCursor.Decode(cursor);
+
+        // The "Likes" tab: order by WHEN the user liked the tweet (newest like first), not the tweet's own
+        // time — so the keyset is over the like row's (CreatedAtUtc, TweetId). A user likes a tweet at most
+        // once, so TweetId is unique within this set and serves as the stable tiebreaker. We page the like
+        // rows first, then load the tweet projections for just that page (one query) and stitch them back in
+        // like-order — mirroring how the Following feed pages a derived ordering it can't project through.
+        var likes = Context.Likes.AsNoTracking().Where(l => l.UserId == likerId);
+        if (position is not null)
+        {
+            likes = likes.Where(l =>
+                l.CreatedAtUtc < position.CreatedAtUtc
+                || (l.CreatedAtUtc == position.CreatedAtUtc && l.TweetId.CompareTo(position.Id) < 0));
+        }
+
+        var pageLikes = await likes
+            .OrderByDescending(l => l.CreatedAtUtc)
+            .ThenByDescending(l => l.TweetId)
+            .Take(limit + 1)
+            .Select(l => new { l.TweetId, l.CreatedAtUtc })
+            .ToListAsync(ct);
+
+        var hasMore = pageLikes.Count > limit;
+        var page = hasMore ? pageLikes.Take(limit).ToList() : pageLikes;
+        var tweetIds = page.Select(l => l.TweetId).ToList();
+
+        var tweetsById = await Project(
+                Context.Tweets.AsNoTracking().Where(t => tweetIds.Contains(t.Id)), currentUserId)
+            .ToDictionaryAsync(t => t.Id, ct);
+
+        // Re-stitch in like-order; a tweet liked but since deleted is simply skipped.
+        var items = new List<TweetDto>(page.Count);
+        foreach (var like in page)
+        {
+            if (tweetsById.TryGetValue(like.TweetId, out var dto))
+            {
+                items.Add(dto);
+            }
+        }
+
+        var nextCursor = hasMore && page.Count > 0
+            ? new TweetCursor(page[^1].CreatedAtUtc, page[^1].TweetId).Encode()
+            : null;
+
+        return new CursorPage<TweetDto>(items, nextCursor);
+    }
+
     public async Task<TweetDto?> GetByIdWithAuthorAsync(Guid id, Guid? currentUserId, CancellationToken ct = default) =>
         await Project(Context.Tweets.AsNoTracking().Where(t => t.Id == id), currentUserId)
             .FirstOrDefaultAsync(ct);

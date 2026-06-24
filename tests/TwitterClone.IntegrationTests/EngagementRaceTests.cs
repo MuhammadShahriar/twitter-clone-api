@@ -111,7 +111,7 @@ public class EngagementRaceTests
             null, 0, 1, 0, true, false, null, []);
 
     private static UserDto SampleUser(Guid id) =>
-        new(id, "@someone", "Someone", null, DateTime.UtcNow, 1, 0, true);
+        new(id, "@someone", "Someone", null, null, DateTime.UtcNow, 1, 0, true);
 
     private sealed class FakeUnitOfWork(Exception? toThrow = null) : IUnitOfWork
     {
@@ -148,6 +148,12 @@ public class EngagementRaceTests
             throw new NotImplementedException();
 
         public Task<CursorPage<TweetDto>> GetFollowingFeedAsync(Guid currentUserId, string? cursor, int limit, CancellationToken ct = default) =>
+            throw new NotImplementedException();
+
+        public Task<CursorPage<TweetDto>> GetUserTweetsAsync(Guid authorId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default) =>
+            throw new NotImplementedException();
+
+        public Task<CursorPage<TweetDto>> GetUserLikedTweetsAsync(Guid likerId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default) =>
             throw new NotImplementedException();
 
         public Task<IReadOnlyList<Tweet>> GetDirectRepliesAsync(Guid parentId, CancellationToken ct = default) =>

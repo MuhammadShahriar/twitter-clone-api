@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TwitterClone.Application.Common.Interfaces;
 using TwitterClone.Application.Users;
+using TwitterClone.Infrastructure.Identity;
 
 namespace TwitterClone.Infrastructure.Persistence.Repositories;
 
@@ -12,27 +13,34 @@ namespace TwitterClone.Infrastructure.Persistence.Repositories;
 /// </summary>
 public class UserRepository(ApplicationDbContext context) : IUserRepository
 {
-    public async Task<UserDto?> GetByHandleAsync(string handle, Guid? currentUserId, CancellationToken ct = default) =>
-        await context.Users
+    public async Task<UserDto?> GetByHandleAsync(string handle, Guid? currentUserId, CancellationToken ct = default)
+    {
+        var normalizedHandle = HandleNormalizer.Normalize(handle);
+        return await context.Users
             .AsNoTracking()
-            .Where(u => u.Handle == handle)
+            .Where(u => u.NormalizedHandle == normalizedHandle)
             .Select(u => new UserDto(
                 u.Id,
                 u.Handle,
                 u.DisplayName,
                 u.Bio,
+                u.AvatarUrl,
                 u.CreatedAtUtc,
                 context.Follows.Count(f => f.FolloweeId == u.Id),
                 context.Follows.Count(f => f.FollowerId == u.Id),
                 currentUserId != null && context.Follows.Any(f => f.FollowerId == currentUserId && f.FolloweeId == u.Id)))
             .FirstOrDefaultAsync(ct);
+    }
 
-    public async Task<Guid?> GetIdByHandleAsync(string handle, CancellationToken ct = default) =>
-        await context.Users
+    public async Task<Guid?> GetIdByHandleAsync(string handle, CancellationToken ct = default)
+    {
+        var normalizedHandle = HandleNormalizer.Normalize(handle);
+        return await context.Users
             .AsNoTracking()
-            .Where(u => u.Handle == handle)
+            .Where(u => u.NormalizedHandle == normalizedHandle)
             .Select(u => (Guid?)u.Id)
             .FirstOrDefaultAsync(ct);
+    }
 
     public async Task<IReadOnlyList<UserSuggestionDto>> GetSuggestionsAsync(
         Guid currentUserId, int limit, CancellationToken ct = default) =>
@@ -57,8 +65,7 @@ public class UserRepository(ApplicationDbContext context) : IUserRepository
                 u.Id,
                 u.Handle,
                 u.DisplayName,
-                // No avatar storage yet — null; the client renders a placeholder.
-                (string?)null,
+                u.AvatarUrl,
                 u.Bio,
                 context.Follows.Count(f => f.FolloweeId == u.Id)))
             .ToListAsync(ct);

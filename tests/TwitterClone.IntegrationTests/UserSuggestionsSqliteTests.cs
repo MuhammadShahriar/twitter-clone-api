@@ -104,6 +104,7 @@ public class UserSuggestionsSqliteTests : IDisposable
     {
         Id = id,
         Handle = handle,
+        NormalizedHandle = HandleNormalizer.Normalize(handle),
         DisplayName = handle.TrimStart('@'),
         UserName = $"{handle.TrimStart('@')}@example.com",
         Email = $"{handle.TrimStart('@')}@example.com",

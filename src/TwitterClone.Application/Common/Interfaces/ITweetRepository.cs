@@ -57,6 +57,13 @@ public interface ITweetRepository : IRepository<Tweet>
     Task<bool> ExistsAsync(Guid id, CancellationToken ct = default);
 
     /// <summary>
+    /// The id of the tweet's author (their <c>AspNetUsers.Id</c>), or <c>null</c> if the tweet doesn't
+    /// exist. Used to resolve the notification recipient when someone acts on a tweet, without fetching
+    /// the whole row.
+    /// </summary>
+    Task<Guid?> GetAuthorIdAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
     /// Loads the direct replies to <paramref name="parentId"/> as tracked entities so they can be staged for
     /// removal when their parent is deleted (cascade is handled in the delete handler for provider-independence).
     /// </summary>

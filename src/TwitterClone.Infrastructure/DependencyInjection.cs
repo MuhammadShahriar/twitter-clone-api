@@ -6,6 +6,7 @@ using TwitterClone.Application.Common.Interfaces;
 using TwitterClone.Infrastructure.Authentication;
 using TwitterClone.Infrastructure.Identity;
 using TwitterClone.Infrastructure.Media;
+using TwitterClone.Infrastructure.Notifications;
 using TwitterClone.Infrastructure.Persistence;
 using TwitterClone.Infrastructure.Persistence.Repositories;
 
@@ -30,7 +31,13 @@ public static class DependencyInjection
         services.AddScoped<IFollowRepository, FollowRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // Notifications (Module 5A): the creation policy (self-skip + unread dedup) lives behind
+        // INotificationService; the four social-action handlers stage a notification through it, committed
+        // by their own SaveChanges. Scoped so it shares the request's DbContext with the action.
+        services.AddScoped<INotificationService, NotificationService>();
 
         // ASP.NET Core Identity foundation (Module 1A): registers UserManager and the EF-backed user
         // store that later sub-steps build register/login/JWT on. No endpoints, sign-in cookies or

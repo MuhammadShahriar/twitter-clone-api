@@ -2,6 +2,7 @@ using MediatR;
 using TwitterClone.Application.Common.Exceptions;
 using TwitterClone.Application.Common.Interfaces;
 using TwitterClone.Domain.Entities;
+using TwitterClone.Domain.Enums;
 
 namespace TwitterClone.Application.Tweets.Commands.RetweetTweet;
 
@@ -9,7 +10,8 @@ public class RetweetTweetCommandHandler(
     ITweetRepository tweetRepository,
     IRetweetRepository retweetRepository,
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUser)
+    ICurrentUserService currentUser,
+    INotificationService notifications)
     : IRequestHandler<RetweetTweetCommand, TweetDto>
 {
     public async Task<TweetDto> Handle(RetweetTweetCommand request, CancellationToken cancellationToken)
@@ -32,6 +34,16 @@ public class RetweetTweetCommandHandler(
             try
             {
                 await retweetRepository.AddAsync(new Retweet(userId, request.TweetId), cancellationToken);
+
+                // A genuinely new retweet: notify the tweet's author (self-retweets are skipped inside the
+                // service). Staged here so it commits in the same SaveChanges as the retweet itself.
+                var authorId = await tweetRepository.GetAuthorIdAsync(request.TweetId, cancellationToken);
+                if (authorId is Guid recipient)
+                {
+                    await notifications.CreateAsync(
+                        recipient, userId, NotificationType.Retweet, request.TweetId, cancellationToken);
+                }
+
                 await unitOfWork.SaveChangesAsync(cancellationToken);
             }
             catch (UniqueConstraintViolationException)

@@ -4,6 +4,7 @@ using MediatR;
 using TwitterClone.Application.Common.Exceptions;
 using TwitterClone.Application.Common.Interfaces;
 using TwitterClone.Domain.Entities;
+using TwitterClone.Domain.Enums;
 
 namespace TwitterClone.Application.Users.Commands.FollowUser;
 
@@ -11,7 +12,8 @@ public class FollowUserCommandHandler(
     IUserRepository userRepository,
     IFollowRepository followRepository,
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUser)
+    ICurrentUserService currentUser,
+    INotificationService notifications)
     : IRequestHandler<FollowUserCommand, UserDto>
 {
     public async Task<UserDto> Handle(FollowUserCommand request, CancellationToken cancellationToken)
@@ -40,6 +42,12 @@ public class FollowUserCommandHandler(
             try
             {
                 await followRepository.AddAsync(new Follow(followerId, followeeId), cancellationToken);
+
+                // A genuinely new follow: notify the followee (a follow has no associated tweet, so null).
+                // Self-follow was already rejected above; the service self-skip is a further backstop.
+                await notifications.CreateAsync(
+                    followeeId, followerId, NotificationType.Follow, null, cancellationToken);
+
                 await unitOfWork.SaveChangesAsync(cancellationToken);
             }
             catch (UniqueConstraintViolationException)

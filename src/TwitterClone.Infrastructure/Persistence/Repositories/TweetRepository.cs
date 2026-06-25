@@ -243,6 +243,12 @@ public class TweetRepository(ApplicationDbContext context)
     public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default) =>
         await Context.Tweets.AsNoTracking().AnyAsync(t => t.Id == id, ct);
 
+    public async Task<Guid?> GetAuthorIdAsync(Guid id, CancellationToken ct = default) =>
+        await Context.Tweets.AsNoTracking()
+            .Where(t => t.Id == id)
+            .Select(t => (Guid?)t.AuthorId)
+            .FirstOrDefaultAsync(ct);
+
     public async Task<IReadOnlyList<Tweet>> GetDirectRepliesAsync(Guid parentId, CancellationToken ct = default) =>
         await Context.Tweets.Where(t => t.ParentId == parentId).ToListAsync(ct);
 

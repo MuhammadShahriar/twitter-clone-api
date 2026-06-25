@@ -2,6 +2,7 @@ using MediatR;
 using TwitterClone.Application.Common.Exceptions;
 using TwitterClone.Application.Common.Interfaces;
 using TwitterClone.Domain.Entities;
+using TwitterClone.Domain.Enums;
 
 namespace TwitterClone.Application.Tweets.Commands.LikeTweet;
 
@@ -9,7 +10,8 @@ public class LikeTweetCommandHandler(
     ITweetRepository tweetRepository,
     ILikeRepository likeRepository,
     IUnitOfWork unitOfWork,
-    ICurrentUserService currentUser)
+    ICurrentUserService currentUser,
+    INotificationService notifications)
     : IRequestHandler<LikeTweetCommand, TweetDto>
 {
     public async Task<TweetDto> Handle(LikeTweetCommand request, CancellationToken cancellationToken)
@@ -32,6 +34,16 @@ public class LikeTweetCommandHandler(
             try
             {
                 await likeRepository.AddAsync(new Like(userId, request.TweetId), cancellationToken);
+
+                // A genuinely new like: notify the tweet's author (self-likes are skipped inside the
+                // service). Staged here so it commits in the same SaveChanges as the like itself.
+                var authorId = await tweetRepository.GetAuthorIdAsync(request.TweetId, cancellationToken);
+                if (authorId is Guid recipient)
+                {
+                    await notifications.CreateAsync(
+                        recipient, userId, NotificationType.Like, request.TweetId, cancellationToken);
+                }
+
                 await unitOfWork.SaveChangesAsync(cancellationToken);
             }
             catch (UniqueConstraintViolationException)

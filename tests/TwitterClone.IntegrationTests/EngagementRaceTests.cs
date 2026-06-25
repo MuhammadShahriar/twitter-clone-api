@@ -8,6 +8,7 @@ using TwitterClone.Application.Users;
 using TwitterClone.Application.Users.Commands.FollowUser;
 using TwitterClone.Application.Users.Commands.UnfollowUser;
 using TwitterClone.Domain.Entities;
+using TwitterClone.Domain.Enums;
 using Xunit;
 
 namespace TwitterClone.IntegrationTests;
@@ -33,7 +34,8 @@ public class EngagementRaceTests
             new FakeTweetRepository { Exists = true, Dto = SampleTweet() },
             new FakeLikeRepository(existing: null), // null => handler takes the add path that races
             uow,
-            new FakeCurrentUser(Caller));
+            new FakeCurrentUser(Caller),
+            new FakeNotificationService());
 
         var result = await handler.Handle(new LikeTweetCommand(SomeTweet), CancellationToken.None);
 
@@ -66,7 +68,8 @@ public class EngagementRaceTests
             new FakeUserRepository(id: followee, dto: SampleUser(followee)),
             new FakeFollowRepository(existing: null),
             uow,
-            new FakeCurrentUser(Caller));
+            new FakeCurrentUser(Caller),
+            new FakeNotificationService());
 
         var result = await handler.Handle(new FollowUserCommand("@someone"), CancellationToken.None);
 
@@ -100,7 +103,8 @@ public class EngagementRaceTests
             new FakeTweetRepository { Exists = true, Dto = SampleTweet() },
             new FakeLikeRepository(existing: null),
             uow,
-            new FakeCurrentUser(Caller));
+            new FakeCurrentUser(Caller),
+            new FakeNotificationService());
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => handler.Handle(new LikeTweetCommand(SomeTweet), CancellationToken.None));
@@ -131,12 +135,22 @@ public class EngagementRaceTests
         public bool IsAuthenticated => userId is not null;
     }
 
+    private sealed class FakeNotificationService : INotificationService
+    {
+        public Task CreateAsync(
+            Guid recipientId, Guid actorId, NotificationType type, Guid? tweetId, CancellationToken ct = default) =>
+            Task.CompletedTask;
+    }
+
     private sealed class FakeTweetRepository : ITweetRepository
     {
         public bool Exists { get; init; } = true;
         public TweetDto? Dto { get; init; }
 
         public Task<bool> ExistsAsync(Guid id, CancellationToken ct = default) => Task.FromResult(Exists);
+
+        public Task<Guid?> GetAuthorIdAsync(Guid id, CancellationToken ct = default) =>
+            Task.FromResult(Dto?.AuthorId);
 
         public Task<TweetDto?> GetByIdWithAuthorAsync(Guid id, Guid? currentUserId, CancellationToken ct = default) =>
             Task.FromResult(Dto);

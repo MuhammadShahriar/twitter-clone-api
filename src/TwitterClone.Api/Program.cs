@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using TwitterClone.Api.Common;
+using TwitterClone.Api.Hubs;
 using TwitterClone.Application;
 using TwitterClone.Application.Common.Interfaces;
 using TwitterClone.Infrastructure;
@@ -27,6 +29,14 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddJwtBearerAuthentication();
+
+// Real-time notifications (Module 5B): SignalR hub + the publisher that the commit chokepoint (UnitOfWork)
+// uses to push each new notification. Connections are keyed to the user's JWT sub claim so the publisher can
+// target Clients.User(recipientId). The publisher implementation lives here (SignalR is an API concern); the
+// Application/Infrastructure layers only know the INotificationPublisher abstraction.
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IUserIdProvider, SubClaimUserIdProvider>();
+builder.Services.AddScoped<INotificationPublisher, NotificationHubPublisher>();
 
 // Refresh-token cookie settings (Module 1C-ii) — bound here because cookie handling is an API concern.
 builder.Services.Configure<AuthCookieSettings>(builder.Configuration.GetSection(AuthCookieSettings.SectionName));
@@ -82,6 +92,10 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Real-time notification hub. After UseAuthentication/UseAuthorization so [Authorize] applies; the CORS
+// policy (AllowCredentials + explicit origins) already set above lets the browser open the cross-site socket.
+app.MapHub<NotificationHub>(NotificationHub.Path);
 
 // Lightweight liveness endpoint for Render health checks.
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));

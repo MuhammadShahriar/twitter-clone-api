@@ -1,6 +1,7 @@
 using MediatR;
 using TwitterClone.Application.Common.Interfaces;
 using TwitterClone.Domain.Entities;
+using TwitterClone.Domain.Enums;
 
 namespace TwitterClone.Application.Tweets.Commands.CreateTweet;
 
@@ -8,7 +9,8 @@ public class CreateTweetCommandHandler(
     ITweetRepository tweetRepository,
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUser,
-    IImageStorageService imageStorage)
+    IImageStorageService imageStorage,
+    INotificationService notifications)
     : IRequestHandler<CreateTweetCommand, TweetDto>
 {
     public async Task<TweetDto> Handle(CreateTweetCommand request, CancellationToken cancellationToken)
@@ -34,6 +36,20 @@ public class CreateTweetCommandHandler(
 
         // The repository only stages the insert (tweet + its media); the unit of work commits it.
         await tweetRepository.AddAsync(tweet, cancellationToken);
+
+        // If this tweet is a reply, notify the parent tweet's author that they were replied to (self-replies
+        // are skipped inside the service). The parent was already validated to exist; staged here so the
+        // notification commits in the same SaveChanges as the reply. TweetId points at the reply itself.
+        if (tweet.ParentId is Guid parentId)
+        {
+            var parentAuthorId = await tweetRepository.GetAuthorIdAsync(parentId, cancellationToken);
+            if (parentAuthorId is Guid recipient)
+            {
+                await notifications.CreateAsync(
+                    recipient, authorId, NotificationType.Reply, tweet.Id, cancellationToken);
+            }
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Re-read through the author join so the response carries the handle/display name (and the

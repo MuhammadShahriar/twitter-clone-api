@@ -1,3 +1,4 @@
+using TwitterClone.Application.Common.Models;
 using TwitterClone.Application.Users;
 
 namespace TwitterClone.Application.Common.Interfaces;
@@ -28,4 +29,20 @@ public interface IUserRepository
     /// </summary>
     Task<IReadOnlyList<UserSuggestionDto>> GetSuggestionsAsync(
         Guid currentUserId, int limit, CancellationToken ct = default);
+
+    /// <summary>
+    /// The users who follow <paramref name="userId"/>, most-recently-followed first, cursor-paginated. Each
+    /// item is a lite <see cref="UserDto"/> carrying the caller's "followed by me" flag (from
+    /// <paramref name="currentUserId"/>, null ⇒ false — so the caller can follow back from the list).
+    /// </summary>
+    Task<CursorPage<UserDto>> GetFollowersAsync(
+        Guid userId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default);
+
+    /// <summary>
+    /// The users <paramref name="userId"/> follows, most-recently-followed first, cursor-paginated. Each item
+    /// is a lite <see cref="UserDto"/> carrying the caller's "followed by me" flag (from
+    /// <paramref name="currentUserId"/>, null ⇒ false).
+    /// </summary>
+    Task<CursorPage<UserDto>> GetFollowingAsync(
+        Guid userId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default);
 }

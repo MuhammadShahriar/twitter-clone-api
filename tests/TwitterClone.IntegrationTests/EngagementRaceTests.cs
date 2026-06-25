@@ -217,5 +217,11 @@ public class EngagementRaceTests
 
         public Task<IReadOnlyList<UserSuggestionDto>> GetSuggestionsAsync(Guid currentUserId, int limit, CancellationToken ct = default) =>
             throw new NotImplementedException();
+
+        public Task<CursorPage<UserDto>> GetFollowersAsync(Guid userId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default) =>
+            throw new NotImplementedException();
+
+        public Task<CursorPage<UserDto>> GetFollowingAsync(Guid userId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default) =>
+            throw new NotImplementedException();
     }
 }

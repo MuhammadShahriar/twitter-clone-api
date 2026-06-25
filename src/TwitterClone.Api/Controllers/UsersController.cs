@@ -10,6 +10,8 @@ using TwitterClone.Application.Users.Commands.UnfollowUser;
 using TwitterClone.Application.Users.Commands.DeleteAvatar;
 using TwitterClone.Application.Users.Commands.UpdateAvatar;
 using TwitterClone.Application.Users.Commands.UpdateProfile;
+using TwitterClone.Application.Users.Queries.GetFollowers;
+using TwitterClone.Application.Users.Queries.GetFollowing;
 using TwitterClone.Application.Users.Queries.GetUserByHandle;
 using TwitterClone.Application.Users.Queries.GetUserLikes;
 using TwitterClone.Application.Users.Queries.GetUserSuggestions;
@@ -81,6 +83,42 @@ public class UsersController(ISender mediator) : ControllerBase
         CancellationToken cancellationToken)
     {
         var page = await mediator.Send(new GetUserLikesQuery(handle, cursor, limit), cancellationToken);
+        return Ok(page);
+    }
+
+    /// <summary>
+    /// The users who follow this user, most-recently-followed first, cursor-paginated. Public; each item
+    /// carries the caller's <c>isFollowedByCurrentUser</c> flag (so a signed-in caller can follow back).
+    /// 404 if the handle is unknown.
+    /// </summary>
+    [HttpGet("{handle}/followers")]
+    [ProducesResponseType(typeof(CursorPage<UserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CursorPage<UserDto>>> GetFollowers(
+        string handle,
+        [FromQuery] string? cursor,
+        [FromQuery] int? limit,
+        CancellationToken cancellationToken)
+    {
+        var page = await mediator.Send(new GetFollowersQuery(handle, cursor, limit), cancellationToken);
+        return Ok(page);
+    }
+
+    /// <summary>
+    /// The users this user follows, most-recently-followed first, cursor-paginated. Public; each item carries
+    /// the caller's <c>isFollowedByCurrentUser</c> flag (so a signed-in caller can follow back). 404 if the
+    /// handle is unknown.
+    /// </summary>
+    [HttpGet("{handle}/following")]
+    [ProducesResponseType(typeof(CursorPage<UserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CursorPage<UserDto>>> GetFollowing(
+        string handle,
+        [FromQuery] string? cursor,
+        [FromQuery] int? limit,
+        CancellationToken cancellationToken)
+    {
+        var page = await mediator.Send(new GetFollowingQuery(handle, cursor, limit), cancellationToken);
         return Ok(page);
     }
 

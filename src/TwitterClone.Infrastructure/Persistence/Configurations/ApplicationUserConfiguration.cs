@@ -35,6 +35,9 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(u => u.AvatarUrl)
             .HasMaxLength(ApplicationUser.MaxAvatarUrlLength);
 
+        builder.Property(u => u.AvatarPublicId)
+            .HasMaxLength(ApplicationUser.MaxAvatarPublicIdLength);
+
         builder.Property(u => u.CreatedAtUtc)
             .IsRequired();
     }

@@ -161,9 +161,10 @@ public class IdentityService(UserManager<ApplicationUser> userManager) : IIdenti
         return new AuthUser(user.Id, user.Email!, user.Handle, user.DisplayName, user.AvatarUrl);
     }
 
-    public async Task<AuthUser?> UpdateAvatarAsync(
+    public async Task<AvatarMutationResult?> UpdateAvatarAsync(
         Guid userId,
         string avatarUrl,
+        string avatarPublicId,
         CancellationToken cancellationToken = default)
     {
         var user = await userManager.FindByIdAsync(userId.ToString());
@@ -172,7 +173,10 @@ public class IdentityService(UserManager<ApplicationUser> userManager) : IIdenti
             return null;
         }
 
+        // Capture the asset being replaced before overwriting, so the caller can delete it.
+        var previousPublicId = user.AvatarPublicId;
         user.AvatarUrl = avatarUrl;
+        user.AvatarPublicId = avatarPublicId;
 
         var result = await userManager.UpdateAsync(user);
         if (!result.Succeeded)
@@ -181,6 +185,34 @@ public class IdentityService(UserManager<ApplicationUser> userManager) : IIdenti
                 $"Failed to update avatar: {string.Join("; ", result.Errors.Select(e => e.Description))}");
         }
 
-        return new AuthUser(user.Id, user.Email!, user.Handle, user.DisplayName, user.AvatarUrl);
+        return new AvatarMutationResult(
+            new AuthUser(user.Id, user.Email!, user.Handle, user.DisplayName, user.AvatarUrl),
+            previousPublicId);
+    }
+
+    public async Task<AvatarMutationResult?> ClearAvatarAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return null;
+        }
+
+        var previousPublicId = user.AvatarPublicId;
+        user.AvatarUrl = null;
+        user.AvatarPublicId = null;
+
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"Failed to clear avatar: {string.Join("; ", result.Errors.Select(e => e.Description))}");
+        }
+
+        return new AvatarMutationResult(
+            new AuthUser(user.Id, user.Email!, user.Handle, user.DisplayName, user.AvatarUrl),
+            previousPublicId);
     }
 }

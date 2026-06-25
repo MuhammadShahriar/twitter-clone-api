@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.Extensions.DependencyInjection;
+using TwitterClone.Application.Common.Interfaces;
 using Xunit;
 
 namespace TwitterClone.IntegrationTests;
@@ -55,6 +57,58 @@ public class ProfileApiTests : IClassFixture<TestWebAppFactory>
         // So does GET /api/auth/me for the logged-in user.
         var me = await GetAsAsync<CurrentUserResponse>(client, "/api/auth/me", user.AccessToken);
         Assert.Equal("https://images.test/me.png", me.AvatarUrl);
+    }
+
+    [Fact]
+    public async Task Replacing_an_avatar_deletes_the_previous_image_from_the_host()
+    {
+        var client = _factory.CreateClient();
+        var user = await RegisterAndLoginAsync(client, "@replace_avatar", "Replace Avatar");
+
+        // First upload (publicId "fake/first-avatar.png"), then replace it with a second image.
+        await UploadAvatarAsync(client, user.AccessToken, "first-avatar.png", "image/png");
+        var replaced = await UploadAvatarAsync(client, user.AccessToken, "second-avatar.png", "image/png");
+        Assert.Equal("https://images.test/second-avatar.png", replaced.AvatarUrl);
+
+        // The replace best-effort deleted the OLD asset by its public id (and not the new one).
+        var fake = (FakeImageStorageService)_factory.Services.GetRequiredService<IImageStorageService>();
+        Assert.Contains("fake/first-avatar.png", fake.DeletedPublicIds);
+        Assert.DoesNotContain("fake/second-avatar.png", fake.DeletedPublicIds);
+    }
+
+    [Fact]
+    public async Task Delete_avatar_clears_it_everywhere_deletes_the_asset_and_is_idempotent()
+    {
+        var client = _factory.CreateClient();
+        var user = await RegisterAndLoginAsync(client, "@clear_avatar", "Clear Avatar");
+
+        await UploadAvatarAsync(client, user.AccessToken, "to-clear.png", "image/png");
+
+        // DELETE clears the avatar and returns the refreshed (avatar-less) profile.
+        var afterDelete = await DeleteAvatarAsync(client, user.AccessToken);
+        Assert.Null(afterDelete.AvatarUrl);
+
+        // The public profile reflects the cleared avatar.
+        var profile = await client.GetFromJsonAsync<UserResponse>($"/api/users/{user.Handle}");
+        Assert.Null(profile!.AvatarUrl);
+
+        // The old asset was deleted from the host.
+        var fake = (FakeImageStorageService)_factory.Services.GetRequiredService<IImageStorageService>();
+        Assert.Contains("fake/to-clear.png", fake.DeletedPublicIds);
+
+        // Idempotent: deleting again (now there's no avatar) still returns 200 with a null avatar.
+        var again = await DeleteAvatarAsync(client, user.AccessToken);
+        Assert.Null(again.AvatarUrl);
+    }
+
+    [Fact]
+    public async Task Delete_avatar_without_a_token_returns_401()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.DeleteAsync("/api/users/me/avatar");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -188,6 +242,19 @@ public class ProfileApiTests : IClassFixture<TestWebAppFactory>
         form.Add(ImageContent(new byte[] { 1, 2, 3, 4 }, contentType), "image", fileName);
 
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/users/me/avatar") { Content = form };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var user = await response.Content.ReadFromJsonAsync<UserResponse>();
+        Assert.NotNull(user);
+        return user!;
+    }
+
+    private static async Task<UserResponse> DeleteAvatarAsync(HttpClient client, string accessToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, "/api/users/me/avatar");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         var response = await client.SendAsync(request);

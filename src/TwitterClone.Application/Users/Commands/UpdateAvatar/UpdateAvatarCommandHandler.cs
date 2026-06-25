@@ -21,11 +21,18 @@ public class UpdateAvatarCommandHandler(
         // the browser. Validation has already capped the size/type, so nothing invalid reaches the host.
         var uploaded = await imageStorage.UploadAsync(request.Image, cancellationToken);
 
-        var updated = await identityService.UpdateAvatarAsync(userId, uploaded.Url, cancellationToken)
+        var mutation = await identityService.UpdateAvatarAsync(
+            userId, uploaded.Url, uploaded.PublicId, cancellationToken)
             ?? throw new NotFoundException("User", userId);
 
+        // Best-effort: delete the now-replaced asset so a re-upload doesn't orphan the old image on the host.
+        if (!string.IsNullOrEmpty(mutation.PreviousPublicId) && mutation.PreviousPublicId != uploaded.PublicId)
+        {
+            await AvatarCleanup.TryDeleteAsync(imageStorage, mutation.PreviousPublicId, cancellationToken);
+        }
+
         // Re-read the full lite profile so the response matches GET /api/users/{handle} (now with the avatar).
-        var dto = await userRepository.GetByHandleAsync(updated.Handle, userId, cancellationToken);
+        var dto = await userRepository.GetByHandleAsync(mutation.User.Handle, userId, cancellationToken);
         return dto!;
     }
 }

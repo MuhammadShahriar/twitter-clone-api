@@ -18,6 +18,7 @@ public class ApplicationUser : IdentityUser<Guid>
     public const int MaxDisplayNameLength = 100;
     public const int MaxBioLength = 280;
     public const int MaxAvatarUrlLength = 500;
+    public const int MaxAvatarPublicIdLength = 255;
 
     /// <summary>The public @handle as the user typed it (case + any leading @ preserved). Shown in the UI.</summary>
     public string Handle { get; set; } = string.Empty;
@@ -37,6 +38,12 @@ public class ApplicationUser : IdentityUser<Guid>
 
     /// <summary>Optional URL of the user's avatar image (hosted on the image provider). Null ⇒ placeholder.</summary>
     public string? AvatarUrl { get; set; }
+
+    /// <summary>
+    /// The image host's public id for the current avatar (kept alongside <see cref="AvatarUrl"/> so the asset
+    /// can be deleted when the avatar is replaced or removed — avoids orphaning images). Null when no avatar.
+    /// </summary>
+    public string? AvatarPublicId { get; set; }
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 }

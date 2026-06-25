@@ -42,4 +42,15 @@ public sealed class CloudinaryImageStorageService : IImageStorageService
 
         return new ImageUploadResult(result.SecureUrl.ToString(), result.PublicId);
     }
+
+    public async Task DeleteAsync(string publicId, CancellationToken ct = default)
+    {
+        // Best-effort cleanup of a replaced/removed asset. Callers swallow failures, but surface a real
+        // Cloudinary error here so the caller can log it if it chooses to.
+        var result = await _cloudinary.DestroyAsync(new CloudinaryDotNet.Actions.DeletionParams(publicId));
+        if (result.Error is not null)
+        {
+            throw new InvalidOperationException($"Cloudinary delete failed: {result.Error.Message}");
+        }
+    }
 }

@@ -7,6 +7,7 @@ using TwitterClone.Application.Tweets;
 using TwitterClone.Application.Users;
 using TwitterClone.Application.Users.Commands.FollowUser;
 using TwitterClone.Application.Users.Commands.UnfollowUser;
+using TwitterClone.Application.Users.Commands.DeleteAvatar;
 using TwitterClone.Application.Users.Commands.UpdateAvatar;
 using TwitterClone.Application.Users.Commands.UpdateProfile;
 using TwitterClone.Application.Users.Queries.GetUserByHandle;
@@ -128,6 +129,21 @@ public class UsersController(ISender mediator) : ControllerBase
             request.Image.FileName, request.Image.ContentType, request.Image.Length, buffer.ToArray());
 
         var user = await mediator.Send(new UpdateAvatarCommand(image), cancellationToken);
+        return Ok(user);
+    }
+
+    /// <summary>
+    /// Removes the authenticated caller's avatar and returns their refreshed lite profile (now avatar-less).
+    /// Best-effort deletes the old image from the host. Idempotent — removing when there is no avatar still
+    /// returns 200. Requires authentication (401).
+    /// </summary>
+    [HttpDelete("me/avatar")]
+    [Authorize]
+    [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<UserDto>> DeleteAvatar(CancellationToken cancellationToken)
+    {
+        var user = await mediator.Send(new DeleteAvatarCommand(), cancellationToken);
         return Ok(user);
     }
 

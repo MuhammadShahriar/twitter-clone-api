@@ -43,11 +43,22 @@ public interface IIdentityService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Sets the user's avatar to the given hosted image URL. Returns the updated user, or <c>null</c> if no
-    /// such user exists.
+    /// Sets the user's avatar to the given hosted image URL + storage public id. Returns the updated user
+    /// together with the previous public id it replaced (so the caller can clean up the old asset), or
+    /// <c>null</c> if no such user exists.
     /// </summary>
-    Task<AuthUser?> UpdateAvatarAsync(
+    Task<AvatarMutationResult?> UpdateAvatarAsync(
         Guid userId,
         string avatarUrl,
+        string avatarPublicId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clears the user's avatar (URL + public id set to null). Returns the updated user together with the
+    /// public id that was cleared (so the caller can delete the old asset), or <c>null</c> if no such user
+    /// exists. Idempotent: clearing an already-avatarless user succeeds with a null previous public id.
+    /// </summary>
+    Task<AvatarMutationResult?> ClearAvatarAsync(
+        Guid userId,
         CancellationToken cancellationToken = default);
 }

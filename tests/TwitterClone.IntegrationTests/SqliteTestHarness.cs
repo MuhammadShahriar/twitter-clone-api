@@ -37,7 +37,7 @@ internal sealed class SqliteTestHarness : IDisposable
     public ApplicationDbContext NewContext() => new(Options);
 
     /// <summary>Builds a minimally-populated Identity user (just enough columns to insert and read back).</summary>
-    public static ApplicationUser NewUser(Guid id, string handle) => new()
+    public static ApplicationUser NewUser(Guid id, string handle, string? avatarUrl = null) => new()
     {
         Id = id,
         Handle = handle,
@@ -45,6 +45,7 @@ internal sealed class SqliteTestHarness : IDisposable
         DisplayName = handle.TrimStart('@'),
         UserName = $"{handle.TrimStart('@')}@example.com",
         Email = $"{handle.TrimStart('@')}@example.com",
+        AvatarUrl = avatarUrl,
     };
 
     public void Dispose() => _connection.Dispose();

@@ -102,6 +102,40 @@ public class TweetReadsSqliteTests
     }
 
     [Fact]
+    public async Task Feed_carries_the_author_avatar_url_when_set_and_null_when_not()
+    {
+        using var db = new SqliteTestHarness();
+
+        var withAvatar = Guid.NewGuid();
+        var noAvatar = Guid.NewGuid();
+        var t1 = Guid.NewGuid();
+        var t2 = Guid.NewGuid();
+        const string avatarUrl = "https://images.test/avatar.png";
+
+        await using (var seed = db.NewContext())
+        {
+            seed.Users.AddRange(
+                SqliteTestHarness.NewUser(withAvatar, "@has_avatar", avatarUrl),
+                SqliteTestHarness.NewUser(noAvatar, "@no_avatar"));
+
+            seed.Tweets.AddRange(
+                new Tweet("by a user with an avatar", withAvatar) { Id = t1, CreatedAtUtc = At(10) },
+                new Tweet("by a user without an avatar", noAvatar) { Id = t2, CreatedAtUtc = At(20) });
+
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = db.NewContext();
+        var repository = new TweetRepository(context);
+
+        var page = await repository.GetFeedAsync(currentUserId: null, cursor: null, limit: 50);
+
+        // The author's avatar rides along from the same join — populated for one author, null for the other.
+        Assert.Equal(avatarUrl, page.Items.Single(t => t.Id == t1).AuthorAvatarUrl);
+        Assert.Null(page.Items.Single(t => t.Id == t2).AuthorAvatarUrl);
+    }
+
+    [Fact]
     public async Task Replies_translate_oldest_first_with_counts()
     {
         using var db = new SqliteTestHarness();

@@ -107,7 +107,7 @@ public class EngagementRaceTests
     }
 
     private static TweetDto SampleTweet() =>
-        new(SomeTweet, "content", Guid.NewGuid(), "@author", "Author", DateTime.UtcNow,
+        new(SomeTweet, "content", Guid.NewGuid(), "@author", "Author", null, DateTime.UtcNow,
             null, 0, 1, 0, true, false, null, []);
 
     private static UserDto SampleUser(Guid id) =>

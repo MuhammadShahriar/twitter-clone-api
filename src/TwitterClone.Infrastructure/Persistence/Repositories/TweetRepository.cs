@@ -261,6 +261,9 @@ public class TweetRepository(ApplicationDbContext context)
             tweet.AuthorId,
             user.Handle,
             user.DisplayName,
+            // From the already-joined author — no extra query, no N+1. Scope guard: this is the tweet
+            // author's avatar only; the retweeter (RetweetedBy) avatar is a separate, deferred enhancement.
+            user.AvatarUrl,
             tweet.CreatedAtUtc,
             tweet.ParentId,
             Context.Tweets.Count(r => r.ParentId == tweet.Id),

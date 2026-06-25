@@ -1,8 +1,9 @@
 namespace TwitterClone.Application.Tweets;
 
 /// <summary>
-/// Read model returned by the API for a tweet. The author fields are populated by a read-side join
-/// to the user table (done in Infrastructure), so the Application layer never sees the Identity type.
+/// Read model returned by the API for a tweet. The author fields (handle, display name, avatar) are
+/// populated by a read-side join to the user table (done in Infrastructure), so the Application layer never
+/// sees the Identity type. <see cref="AuthorAvatarUrl"/> is the tweet author's avatar (null ⇒ no avatar set).
 /// <para>
 /// <see cref="ParentId"/> is the tweet this one replies to (null for a top-level tweet); <see cref="ReplyCount"/>
 /// is the number of direct replies, computed on the read side (a correlated count — no denormalised counter).
@@ -25,6 +26,7 @@ public record TweetDto(
     Guid AuthorId,
     string AuthorHandle,
     string AuthorDisplayName,
+    string? AuthorAvatarUrl,
     DateTime CreatedAtUtc,
     Guid? ParentId,
     int ReplyCount,

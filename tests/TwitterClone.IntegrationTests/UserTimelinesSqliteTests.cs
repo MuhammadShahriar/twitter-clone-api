@@ -89,6 +89,41 @@ public class UserTimelinesSqliteTests
     }
 
     [Fact]
+    public async Task UserTweets_carry_the_author_avatar_url()
+    {
+        using var db = new SqliteTestHarness();
+
+        var withAvatar = Guid.NewGuid();
+        var noAvatar = Guid.NewGuid();
+        var withAvatarTweet = Guid.NewGuid();
+        var noAvatarTweet = Guid.NewGuid();
+        const string avatarUrl = "https://images.test/tl-avatar.png";
+
+        await using (var seed = db.NewContext())
+        {
+            seed.Users.AddRange(
+                SqliteTestHarness.NewUser(withAvatar, "@tl_has_avatar", avatarUrl),
+                SqliteTestHarness.NewUser(noAvatar, "@tl_no_avatar"));
+
+            seed.Tweets.AddRange(
+                new Tweet("mine, with avatar", withAvatar) { Id = withAvatarTweet, CreatedAtUtc = At(10) },
+                new Tweet("mine, no avatar", noAvatar) { Id = noAvatarTweet, CreatedAtUtc = At(20) });
+
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = db.NewContext();
+        var repository = new TweetRepository(context);
+
+        // The avatared user's own timeline carries the avatar; the other user's timeline carries null.
+        var avatared = await repository.GetUserTweetsAsync(withAvatar, currentUserId: null, cursor: null, limit: 50);
+        Assert.Equal(avatarUrl, avatared.Items.Single().AuthorAvatarUrl);
+
+        var plain = await repository.GetUserTweetsAsync(noAvatar, currentUserId: null, cursor: null, limit: 50);
+        Assert.Null(plain.Items.Single().AuthorAvatarUrl);
+    }
+
+    [Fact]
     public async Task UserLikes_translate_ordered_by_like_time_with_flags_and_paginate()
     {
         using var db = new SqliteTestHarness();

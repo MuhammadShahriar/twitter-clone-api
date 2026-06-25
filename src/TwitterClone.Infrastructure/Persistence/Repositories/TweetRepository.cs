@@ -236,6 +236,56 @@ public class TweetRepository(ApplicationDbContext context)
         return new CursorPage<TweetDto>(items, nextCursor);
     }
 
+    public async Task<CursorPage<TweetDto>> GetBookmarkedTweetsAsync(
+        Guid bookmarkerId, string? cursor, int limit, CancellationToken ct = default)
+    {
+        var position = TweetCursor.Decode(cursor);
+
+        // The caller's private bookmarks, most-recently-bookmarked first — keyset over the BOOKMARK row's
+        // (CreatedAtUtc, TweetId) (a user bookmarks a tweet at most once, so TweetId is the stable tiebreaker).
+        // Same shape as GetUserLikedTweetsAsync: page the bookmark rows, load the tweet projections for just
+        // that page in one query, then re-stitch in bookmark-order. The caller is the bookmarker, so the
+        // per-caller flags use their own id.
+        var bookmarks = Context.Bookmarks.AsNoTracking().Where(b => b.UserId == bookmarkerId);
+        if (position is not null)
+        {
+            bookmarks = bookmarks.Where(b =>
+                b.CreatedAtUtc < position.CreatedAtUtc
+                || (b.CreatedAtUtc == position.CreatedAtUtc && b.TweetId.CompareTo(position.Id) < 0));
+        }
+
+        var pageBookmarks = await bookmarks
+            .OrderByDescending(b => b.CreatedAtUtc)
+            .ThenByDescending(b => b.TweetId)
+            .Take(limit + 1)
+            .Select(b => new { b.TweetId, b.CreatedAtUtc })
+            .ToListAsync(ct);
+
+        var hasMore = pageBookmarks.Count > limit;
+        var page = hasMore ? pageBookmarks.Take(limit).ToList() : pageBookmarks;
+        var tweetIds = page.Select(b => b.TweetId).ToList();
+
+        var tweetsById = await Project(
+                Context.Tweets.AsNoTracking().Where(t => tweetIds.Contains(t.Id)), bookmarkerId)
+            .ToDictionaryAsync(t => t.Id, ct);
+
+        // Re-stitch in bookmark-order; a tweet bookmarked but since deleted is simply skipped.
+        var items = new List<TweetDto>(page.Count);
+        foreach (var bookmark in page)
+        {
+            if (tweetsById.TryGetValue(bookmark.TweetId, out var dto))
+            {
+                items.Add(dto);
+            }
+        }
+
+        var nextCursor = hasMore && page.Count > 0
+            ? new TweetCursor(page[^1].CreatedAtUtc, page[^1].TweetId).Encode()
+            : null;
+
+        return new CursorPage<TweetDto>(items, nextCursor);
+    }
+
     public async Task<TweetDto?> GetByIdWithAuthorAsync(Guid id, Guid? currentUserId, CancellationToken ct = default) =>
         await Project(Context.Tweets.AsNoTracking().Where(t => t.Id == id), currentUserId)
             .FirstOrDefaultAsync(ct);
@@ -277,6 +327,8 @@ public class TweetRepository(ApplicationDbContext context)
             Context.Retweets.Count(r => r.TweetId == tweet.Id),
             currentUserId != null && Context.Likes.Any(l => l.TweetId == tweet.Id && l.UserId == currentUserId),
             currentUserId != null && Context.Retweets.Any(r => r.TweetId == tweet.Id && r.UserId == currentUserId),
+            // Bookmarks are private: only a "by me" flag (no public count). Null caller ⇒ false.
+            currentUserId != null && Context.Bookmarks.Any(b => b.TweetId == tweet.Id && b.UserId == currentUserId),
             // RetweetedBy is set only by the Following-feed merge (for retweet entries); null for every other read.
             (RetweetedByDto?)null,
             tweet.Media

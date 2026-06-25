@@ -112,7 +112,7 @@ public class EngagementRaceTests
 
     private static TweetDto SampleTweet() =>
         new(SomeTweet, "content", Guid.NewGuid(), "@author", "Author", null, DateTime.UtcNow,
-            null, 0, 1, 0, true, false, null, []);
+            null, 0, 1, 0, true, false, false, null, []);
 
     private static UserDto SampleUser(Guid id) =>
         new(id, "@someone", "Someone", null, null, DateTime.UtcNow, 1, 0, true);
@@ -168,6 +168,9 @@ public class EngagementRaceTests
             throw new NotImplementedException();
 
         public Task<CursorPage<TweetDto>> GetUserLikedTweetsAsync(Guid likerId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default) =>
+            throw new NotImplementedException();
+
+        public Task<CursorPage<TweetDto>> GetBookmarkedTweetsAsync(Guid bookmarkerId, string? cursor, int limit, CancellationToken ct = default) =>
             throw new NotImplementedException();
 
         public Task<IReadOnlyList<Tweet>> GetDirectRepliesAsync(Guid parentId, CancellationToken ct = default) =>

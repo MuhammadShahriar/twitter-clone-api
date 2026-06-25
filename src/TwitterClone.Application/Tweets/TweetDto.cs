@@ -11,8 +11,10 @@ namespace TwitterClone.Application.Tweets;
 /// <para>
 /// <see cref="LikeCount"/>/<see cref="RetweetCount"/> are the engagement totals (also correlated counts);
 /// <see cref="LikedByCurrentUser"/>/<see cref="RetweetedByCurrentUser"/> say whether the caller has liked /
-/// retweeted this tweet (always <c>false</c> for an anonymous reader). <see cref="Media"/> are the attached
-/// images (hosted URL + order), populated by the read-side projection.
+/// retweeted this tweet (always <c>false</c> for an anonymous reader). <see cref="BookmarkedByCurrentUser"/>
+/// says whether the caller has bookmarked it (also <c>false</c> when anonymous); bookmarks are private, so
+/// there is no public bookmark <em>count</em>. <see cref="Media"/> are the attached images (hosted URL +
+/// order), populated by the read-side projection.
 /// </para>
 /// <para>
 /// <see cref="RetweetedBy"/> is non-null only for a retweet entry in the <b>Following feed</b> — the
@@ -34,5 +36,6 @@ public record TweetDto(
     int RetweetCount,
     bool LikedByCurrentUser,
     bool RetweetedByCurrentUser,
+    bool BookmarkedByCurrentUser,
     RetweetedByDto? RetweetedBy,
     IReadOnlyList<TweetMediaDto> Media);

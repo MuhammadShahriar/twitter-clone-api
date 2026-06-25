@@ -6,8 +6,10 @@ using TwitterClone.Application.Common.Models;
 using TwitterClone.Application.Tweets;
 using TwitterClone.Application.Tweets.Commands.CreateTweet;
 using TwitterClone.Application.Tweets.Commands.DeleteTweet;
+using TwitterClone.Application.Tweets.Commands.BookmarkTweet;
 using TwitterClone.Application.Tweets.Commands.LikeTweet;
 using TwitterClone.Application.Tweets.Commands.RetweetTweet;
+using TwitterClone.Application.Tweets.Commands.UnbookmarkTweet;
 using TwitterClone.Application.Tweets.Commands.UnlikeTweet;
 using TwitterClone.Application.Tweets.Commands.UnretweetTweet;
 using TwitterClone.Application.Tweets.Queries.GetReplies;
@@ -175,6 +177,39 @@ public class TweetsController(ISender mediator) : ControllerBase
     public async Task<ActionResult<TweetDto>> Unretweet(Guid id, CancellationToken cancellationToken)
     {
         var tweet = await mediator.Send(new UnretweetTweetCommand(id), cancellationToken);
+        return Ok(tweet);
+    }
+
+    /// <summary>
+    /// Bookmarks a tweet as the authenticated caller and returns its updated read model (with
+    /// <c>bookmarkedByCurrentUser = true</c>). Bookmarks are private — no count is exposed and no notification
+    /// is raised. Idempotent — bookmarking again is a no-op success. Requires authentication; 404 if the tweet
+    /// does not exist.
+    /// </summary>
+    [HttpPost("{id:guid}/bookmark")]
+    [Authorize]
+    [ProducesResponseType(typeof(TweetDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TweetDto>> Bookmark(Guid id, CancellationToken cancellationToken)
+    {
+        var tweet = await mediator.Send(new BookmarkTweetCommand(id), cancellationToken);
+        return Ok(tweet);
+    }
+
+    /// <summary>
+    /// Removes the caller's bookmark of a tweet and returns its updated read model
+    /// (<c>bookmarkedByCurrentUser = false</c>). Idempotent — un-bookmarking a tweet you haven't bookmarked is
+    /// a no-op success. Requires authentication; 404 if the tweet does not exist.
+    /// </summary>
+    [HttpDelete("{id:guid}/bookmark")]
+    [Authorize]
+    [ProducesResponseType(typeof(TweetDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TweetDto>> Unbookmark(Guid id, CancellationToken cancellationToken)
+    {
+        var tweet = await mediator.Send(new UnbookmarkTweetCommand(id), cancellationToken);
         return Ok(tweet);
     }
 }

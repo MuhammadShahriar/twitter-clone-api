@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<ITweetRepository, TweetRepository>();
         services.AddScoped<ILikeRepository, LikeRepository>();
         services.AddScoped<IRetweetRepository, RetweetRepository>();
+        services.AddScoped<IBookmarkRepository, BookmarkRepository>();
         services.AddScoped<IFollowRepository, FollowRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();

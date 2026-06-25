@@ -50,6 +50,13 @@ public interface ITweetRepository : IRepository<Tweet>
     /// </summary>
     Task<CursorPage<TweetDto>> GetUserLikedTweetsAsync(Guid likerId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default);
 
+    /// <summary>
+    /// The caller's own <b>bookmarked</b> tweets, most-recently-bookmarked first (keyset on the bookmark's
+    /// time then tweet id), cursor-paginated. Bookmarks are private, so this is always read for the owner —
+    /// <paramref name="bookmarkerId"/> is both the bookmark filter and the source of the per-tweet by-me flags.
+    /// </summary>
+    Task<CursorPage<TweetDto>> GetBookmarkedTweetsAsync(Guid bookmarkerId, string? cursor, int limit, CancellationToken ct = default);
+
     /// <summary>Fetches a single tweet (with author info, counts, and the caller's flags) by id, or <c>null</c> if it does not exist.</summary>
     Task<TweetDto?> GetByIdWithAuthorAsync(Guid id, Guid? currentUserId, CancellationToken ct = default);
 

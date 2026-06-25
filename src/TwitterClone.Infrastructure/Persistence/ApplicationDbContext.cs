@@ -24,6 +24,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
     public DbSet<Retweet> Retweets => Set<Retweet>();
 
+    public DbSet<Bookmark> Bookmarks => Set<Bookmark>();
+
     public DbSet<Follow> Follows => Set<Follow>();
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();

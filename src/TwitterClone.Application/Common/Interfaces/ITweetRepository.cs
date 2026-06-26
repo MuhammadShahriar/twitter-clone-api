@@ -57,6 +57,13 @@ public interface ITweetRepository : IRepository<Tweet>
     /// </summary>
     Task<CursorPage<TweetDto>> GetBookmarkedTweetsAsync(Guid bookmarkerId, string? cursor, int limit, CancellationToken ct = default);
 
+    /// <summary>
+    /// Full-text-ish search: tweets whose content contains <paramref name="term"/> (case-insensitive),
+    /// newest-first, cursor-paginated. Searches all tweets (top-level and replies). <paramref name="currentUserId"/>
+    /// drives the caller's like/retweet/bookmark flags (<c>null</c> ⇒ false for an anonymous reader).
+    /// </summary>
+    Task<CursorPage<TweetDto>> SearchAsync(string term, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default);
+
     /// <summary>Fetches a single tweet (with author info, counts, and the caller's flags) by id, or <c>null</c> if it does not exist.</summary>
     Task<TweetDto?> GetByIdWithAuthorAsync(Guid id, Guid? currentUserId, CancellationToken ct = default);
 

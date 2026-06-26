@@ -45,4 +45,13 @@ public interface IUserRepository
     /// </summary>
     Task<CursorPage<UserDto>> GetFollowingAsync(
         Guid userId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default);
+
+    /// <summary>
+    /// Search: users whose handle or display name contains <paramref name="term"/> (case-insensitive),
+    /// newest-account first, cursor-paginated. Each item is a lite <see cref="UserDto"/> carrying the caller's
+    /// "followed by me" flag (from <paramref name="currentUserId"/>, null ⇒ false — so the caller can follow
+    /// from the results).
+    /// </summary>
+    Task<CursorPage<UserDto>> SearchAsync(
+        string term, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default);
 }

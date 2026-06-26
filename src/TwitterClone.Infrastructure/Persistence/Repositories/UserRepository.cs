@@ -72,6 +72,50 @@ public class UserRepository(ApplicationDbContext context) : IUserRepository
                 context.Follows.Count(f => f.FolloweeId == u.Id)))
             .ToListAsync(ct);
 
+    public async Task<CursorPage<UserDto>> SearchAsync(
+        string term, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default)
+    {
+        var position = TweetCursor.Decode(cursor);
+
+        // Case-insensitive substring match on handle OR display name. ToLower().Contains(...) translates to
+        // LOWER(...) + LIKE on BOTH Npgsql and SQLite (so the relational test really exercises it) — unlike
+        // the Npgsql-only EF.Functions.ILike. Newest-account first, keyset over (CreatedAtUtc, Id).
+        var lowered = term.ToLower();
+        var query = context.Users.AsNoTracking()
+            .Where(u => u.Handle.ToLower().Contains(lowered) || u.DisplayName.ToLower().Contains(lowered));
+
+        if (position is not null)
+        {
+            query = query.Where(u =>
+                u.CreatedAtUtc < position.CreatedAtUtc
+                || (u.CreatedAtUtc == position.CreatedAtUtc && u.Id.CompareTo(position.Id) < 0));
+        }
+
+        var rows = await query
+            .OrderByDescending(u => u.CreatedAtUtc)
+            .ThenByDescending(u => u.Id)
+            .Take(limit + 1)
+            .Select(u => new UserDto(
+                u.Id,
+                u.Handle,
+                u.DisplayName,
+                u.Bio,
+                u.AvatarUrl,
+                u.CreatedAtUtc,
+                context.Follows.Count(f => f.FolloweeId == u.Id),
+                context.Follows.Count(f => f.FollowerId == u.Id),
+                currentUserId != null && context.Follows.Any(f => f.FollowerId == currentUserId && f.FolloweeId == u.Id)))
+            .ToListAsync(ct);
+
+        var hasMore = rows.Count > limit;
+        var page = hasMore ? rows.Take(limit).ToList() : rows;
+        var nextCursor = hasMore && page.Count > 0
+            ? new TweetCursor(page[^1].CreatedAtUtc, page[^1].Id).Encode()
+            : null;
+
+        return new CursorPage<UserDto>(page, nextCursor);
+    }
+
     public async Task<CursorPage<UserDto>> GetFollowersAsync(
         Guid userId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default)
     {

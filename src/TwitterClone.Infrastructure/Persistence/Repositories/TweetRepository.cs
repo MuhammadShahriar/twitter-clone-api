@@ -286,6 +286,33 @@ public class TweetRepository(ApplicationDbContext context)
         return new CursorPage<TweetDto>(items, nextCursor);
     }
 
+    public async Task<CursorPage<TweetDto>> SearchAsync(
+        string term, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default)
+    {
+        var position = TweetCursor.Decode(cursor);
+
+        // Case-insensitive substring match on content, across all tweets (top-level and replies), newest-first.
+        // ToLower().Contains(...) translates to LOWER(...) + LIKE on both Npgsql and SQLite (testable), unlike
+        // the Npgsql-only EF.Functions.ILike. Same (CreatedAtUtc, Id) keyset as the main feed.
+        var lowered = term.ToLower();
+        var query = Context.Tweets.AsNoTracking()
+            .Where(t => t.Content.ToLower().Contains(lowered));
+        if (position is not null)
+        {
+            query = query.Where(t =>
+                t.CreatedAtUtc < position.CreatedAtUtc
+                || (t.CreatedAtUtc == position.CreatedAtUtc && t.Id.CompareTo(position.Id) < 0));
+        }
+
+        var rows = await Project(query
+                .OrderByDescending(t => t.CreatedAtUtc)
+                .ThenByDescending(t => t.Id), currentUserId)
+            .Take(limit + 1)
+            .ToListAsync(ct);
+
+        return ToPage(rows, limit);
+    }
+
     public async Task<TweetDto?> GetByIdWithAuthorAsync(Guid id, Guid? currentUserId, CancellationToken ct = default) =>
         await Project(Context.Tweets.AsNoTracking().Where(t => t.Id == id), currentUserId)
             .FirstOrDefaultAsync(ct);

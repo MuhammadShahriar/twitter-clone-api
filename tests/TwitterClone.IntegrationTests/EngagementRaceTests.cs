@@ -173,6 +173,9 @@ public class EngagementRaceTests
         public Task<CursorPage<TweetDto>> GetBookmarkedTweetsAsync(Guid bookmarkerId, string? cursor, int limit, CancellationToken ct = default) =>
             throw new NotImplementedException();
 
+        public Task<CursorPage<TweetDto>> SearchAsync(string term, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default) =>
+            throw new NotImplementedException();
+
         public Task<IReadOnlyList<Tweet>> GetDirectRepliesAsync(Guid parentId, CancellationToken ct = default) =>
             throw new NotImplementedException();
 
@@ -222,6 +225,9 @@ public class EngagementRaceTests
             throw new NotImplementedException();
 
         public Task<CursorPage<UserDto>> GetFollowingAsync(Guid userId, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default) =>
+            throw new NotImplementedException();
+
+        public Task<CursorPage<UserDto>> SearchAsync(string term, Guid? currentUserId, string? cursor, int limit, CancellationToken ct = default) =>
             throw new NotImplementedException();
     }
 }

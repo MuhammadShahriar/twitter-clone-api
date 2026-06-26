@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TwitterClone.Application.Common.Interfaces;
+using TwitterClone.Application.Common.Models;
 using TwitterClone.Infrastructure.Authentication;
 using TwitterClone.Infrastructure.Identity;
 using TwitterClone.Infrastructure.Media;
@@ -78,6 +79,14 @@ public static class DependencyInjection
             .ValidateOnStart();
 
         services.Configure<RefreshTokenSettings>(configuration.GetSection(RefreshTokenSettings.SectionName));
+
+        // Tweet-edit window (Module 11A): bound from the TweetEdit section into a plain POCO so the
+        // Application handler depends on the settings type directly (no IOptions/config package in Application).
+        // Missing section ⇒ the default 30-minute window.
+        var tweetEditSettings = new TweetEditSettings();
+        configuration.GetSection(TweetEditSettings.SectionName).Bind(tweetEditSettings);
+        services.AddSingleton(tweetEditSettings);
+
         services.AddScoped<IIdentityService, IdentityService>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddSingleton<IRefreshTokenService, RefreshTokenService>();

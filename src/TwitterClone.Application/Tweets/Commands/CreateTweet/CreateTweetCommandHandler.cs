@@ -1,5 +1,6 @@
 using MediatR;
 using TwitterClone.Application.Common;
+using TwitterClone.Application.Common.Exceptions;
 using TwitterClone.Application.Common.Interfaces;
 using TwitterClone.Domain.Entities;
 using TwitterClone.Domain.Enums;
@@ -22,7 +23,18 @@ public class CreateTweetCommandHandler(
         var authorId = currentUser.UserId
             ?? throw new UnauthorizedAccessException("Cannot create a tweet without an authenticated user.");
 
-        var tweet = new Tweet(request.Content.Trim(), authorId, request.ParentId);
+        // A quote must reference a tweet that exists. Resolve the quoted author up front (one query that also
+        // serves the Quote notification below): a missing quoted tweet is a 404 — surfaced BEFORE any image
+        // upload so a bad id fails fast without orphaning uploads. (Content-required is enforced by the
+        // validator → 400.) The validator already guarantees the quoted tweet isn't FK-checked as a reply.
+        Guid? quotedAuthorId = null;
+        if (request.QuotedTweetId is Guid quotedId)
+        {
+            quotedAuthorId = await tweetRepository.GetAuthorIdAsync(quotedId, cancellationToken)
+                ?? throw new NotFoundException(nameof(Tweet), quotedId);
+        }
+
+        var tweet = new Tweet(request.Content.Trim(), authorId, request.ParentId, request.QuotedTweetId);
 
         // Backend-proxied upload: push each attached image to the image host (the secret stays server-side)
         // and record the returned URL/publicId on the tweet, preserving attachment order. Validation has
@@ -52,6 +64,15 @@ public class CreateTweetCommandHandler(
                     recipient, authorId, NotificationType.Reply, tweet.Id, cancellationToken);
                 repliedToAuthorId = recipient;
             }
+        }
+
+        // If this is a quote tweet, notify the quoted tweet's author. Self-quote is skipped inside the service
+        // (recipient == actor), and the unread-dedup applies as usual. TweetId points at the quote tweet, so
+        // the click-through target is the quote (not the quoted original). Resolved once, above.
+        if (quotedAuthorId is Guid quotedRecipient)
+        {
+            await notifications.CreateAsync(
+                quotedRecipient, authorId, NotificationType.Quote, tweet.Id, cancellationToken);
         }
 
         // Notify each @handle mentioned in the text. The service already skips self-mentions (recipient ==

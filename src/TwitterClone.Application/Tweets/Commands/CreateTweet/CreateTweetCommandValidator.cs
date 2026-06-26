@@ -20,6 +20,13 @@ public class CreateTweetCommandValidator : AbstractValidator<CreateTweetCommand>
             .MaximumLength(Tweet.MaxContentLength)
             .WithMessage($"Tweet content must be {Tweet.MaxContentLength} characters or fewer.");
 
+        // A quote tweet is a comment ON another tweet, so it must carry text even when it embeds (and even if
+        // it also has images). The non-existent-quoted-id check is in the handler (a 404, not a 400).
+        RuleFor(x => x.Content)
+            .NotEmpty()
+            .WithMessage("A quote tweet must include text.")
+            .When(x => x.QuotedTweetId.HasValue);
+
         // A reply must point at a tweet that exists. Surfaces as a 400 via the validation pipeline.
         When(x => x.ParentId.HasValue, () =>
             RuleFor(x => x.ParentId!.Value)

@@ -6,6 +6,7 @@ using TwitterClone.Application.Common.Models;
 using TwitterClone.Application.Tweets;
 using TwitterClone.Application.Tweets.Commands.CreateTweet;
 using TwitterClone.Application.Tweets.Commands.DeleteTweet;
+using TwitterClone.Application.Tweets.Commands.EditTweet;
 using TwitterClone.Application.Tweets.Commands.BookmarkTweet;
 using TwitterClone.Application.Tweets.Commands.LikeTweet;
 using TwitterClone.Application.Tweets.Commands.RetweetTweet;
@@ -93,11 +94,35 @@ public class TweetsController(ISender mediator) : ControllerBase
             }
         }
 
-        var command = new CreateTweetCommand(request.Content ?? string.Empty, request.ParentId, images);
+        var command = new CreateTweetCommand(
+            request.Content ?? string.Empty, request.ParentId, images, request.QuotedTweetId);
         var tweet = await mediator.Send(command, cancellationToken);
 
         // Location header points at GET /api/tweets/{id} — the canonical create→read pattern.
         return CreatedAtAction(nameof(GetTweetById), new { id = tweet.Id }, tweet);
+    }
+
+    /// <summary>
+    /// Edits a tweet's text (JSON <c>{ content }</c>) and returns the updated tweet (with <c>editedAtUtc</c>
+    /// set). Requires authentication; only the author may edit, and only within the edit window (default 30
+    /// min) of posting. Text only — media is not editable in v1. 200 on success; 400 empty/too-long content;
+    /// 403 if not the author; 404 if the tweet does not exist; 409 if the edit window has expired.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    [Authorize]
+    [ProducesResponseType(typeof(TweetDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<TweetDto>> EditTweet(
+        Guid id,
+        [FromBody] EditTweetRequest request,
+        CancellationToken cancellationToken)
+    {
+        var tweet = await mediator.Send(new EditTweetCommand(id, request.Content ?? string.Empty), cancellationToken);
+        return Ok(tweet);
     }
 
     /// <summary>

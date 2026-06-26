@@ -18,6 +18,10 @@ public class CreateTweetRequest
     [FromForm(Name = "parentId")]
     public Guid? ParentId { get; set; }
 
+    /// <summary>When set, the id of the tweet this one quotes (a quote tweet — top-level, embeds another).</summary>
+    [FromForm(Name = "quotedTweetId")]
+    public Guid? QuotedTweetId { get; set; }
+
     /// <summary>The image files to attach (field name <c>images</c>); up to four, validated downstream.</summary>
     [FromForm(Name = "images")]
     public IFormFileCollection? Images { get; set; }

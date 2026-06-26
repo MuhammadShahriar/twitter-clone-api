@@ -62,6 +62,7 @@ builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
 builder.Services.AddExceptionHandler<AccountLockedExceptionHandler>();
 builder.Services.AddExceptionHandler<NotFoundExceptionHandler>();
 builder.Services.AddExceptionHandler<ForbiddenAccessExceptionHandler>();
+builder.Services.AddExceptionHandler<EditWindowExpiredExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 var app = builder.Build();

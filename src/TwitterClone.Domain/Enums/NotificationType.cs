@@ -24,4 +24,7 @@ public enum NotificationType
 
     /// <summary>Someone mentioned the recipient (<c>@handle</c>) in a tweet or reply.</summary>
     Mention = 4,
+
+    /// <summary>Someone quoted the recipient's tweet (a quote tweet embedding it).</summary>
+    Quote = 5,
 }

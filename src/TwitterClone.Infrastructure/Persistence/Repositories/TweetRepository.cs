@@ -361,7 +361,33 @@ public class TweetRepository(ApplicationDbContext context)
             tweet.Media
                 .OrderBy(m => m.Position)
                 .Select(m => new TweetMediaDto(m.Url, m.PublicId, m.Position))
-                .ToList());
+                .ToList(),
+            // Quote count: how many tweets quote this one (correlated count, like the others — no N+1).
+            Context.Tweets.Count(q => q.QuotedTweetId == tweet.Id),
+            // Delete-surviving "is a quote" flag. QuotedTweetId is SET NULL when the target is deleted, so it
+            // (and the preview below) go null — but IsQuote stays true, letting the client tell a non-quote
+            // (false ⇒ nothing) from a deleted-target quote (true + null preview ⇒ "unavailable").
+            tweet.IsQuote,
+            // One-level quoted preview: a correlated subquery that joins the quoted tweet to its author and
+            // projects the lightweight card. NON-RECURSIVE by construction — QuotedTweetDto has no nested
+            // quote/parent/counts, so a quote-of-a-quote previews only one level. Returns null when this tweet
+            // isn't a quote OR the quoted tweet was deleted: SET NULL nulls QuotedTweetId, and even a stale id
+            // simply matches no row, so FirstOrDefault() yields null ("unavailable"). One join, not per-row.
+            (from q in Context.Tweets
+             where q.Id == tweet.QuotedTweetId
+             join qa in Context.Users on q.AuthorId equals qa.Id
+             select new QuotedTweetDto(
+                 q.Id,
+                 q.Content,
+                 new QuotedTweetAuthorDto(qa.Handle, qa.DisplayName, qa.AvatarUrl),
+                 q.CreatedAtUtc,
+                 q.Media
+                     .OrderBy(m => m.Position)
+                     .Select(m => new TweetMediaDto(m.Url, m.PublicId, m.Position))
+                     .ToList()))
+                .FirstOrDefault(),
+            // When the tweet was last edited (null ⇒ never) — drives the UI's "edited" marker. From the same row.
+            tweet.EditedAtUtc);
 
     /// <summary>
     /// Turns an over-fetched list (limit + 1) into a page: if the extra row is present there are more

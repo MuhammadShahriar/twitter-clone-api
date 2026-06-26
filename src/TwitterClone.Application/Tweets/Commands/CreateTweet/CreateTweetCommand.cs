@@ -19,4 +19,5 @@ namespace TwitterClone.Application.Tweets.Commands.CreateTweet;
 public record CreateTweetCommand(
     string Content,
     Guid? ParentId = null,
-    IReadOnlyList<ImageUpload>? Images = null) : IRequest<TweetDto>;
+    IReadOnlyList<ImageUpload>? Images = null,
+    Guid? QuotedTweetId = null) : IRequest<TweetDto>;

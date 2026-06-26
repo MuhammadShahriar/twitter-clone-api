@@ -29,6 +29,9 @@ public class TweetConfiguration : IEntityTypeConfiguration<Tweet>
         // Replies are looked up by parent ("give me the replies to this tweet").
         builder.HasIndex(t => t.ParentId);
 
+        // Quotes are looked up by the tweet they quote (the quote-count subquery).
+        builder.HasIndex(t => t.QuotedTweetId);
+
         // FK to the Identity user. The Domain has no navigation to ApplicationUser (it stays
         // Identity-free) — the relationship is enforced here, in Infrastructure, by AuthorId only.
         // Deleting a user removes their tweets.
@@ -45,6 +48,15 @@ public class TweetConfiguration : IEntityTypeConfiguration<Tweet>
             .WithMany()
             .HasForeignKey(t => t.ParentId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Second self-reference for quotes: a quote tweet's QuotedTweetId points at the tweet it embeds.
+        // SET NULL (not Cascade) so deleting the quoted tweet nulls the reference in the quotes of it — the
+        // quote survives and renders "unavailable" — rather than deleting the quotes or FK-erroring on our
+        // hard delete. No navigation property (the Domain carries only the QuotedTweetId value).
+        builder.HasOne<Tweet>()
+            .WithMany()
+            .HasForeignKey(t => t.QuotedTweetId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         // Attached images are a child of the Tweet aggregate (one-to-many, FK TweetMedia.TweetId).
         // Cascade so deleting a tweet removes its images. Map the read-only Media collection via its

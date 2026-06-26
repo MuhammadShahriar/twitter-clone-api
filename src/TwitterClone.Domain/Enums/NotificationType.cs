@@ -21,4 +21,7 @@ public enum NotificationType
 
     /// <summary>Someone retweeted the recipient's tweet.</summary>
     Retweet = 3,
+
+    /// <summary>Someone mentioned the recipient (<c>@handle</c>) in a tweet or reply.</summary>
+    Mention = 4,
 }

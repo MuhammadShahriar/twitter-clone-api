@@ -1,4 +1,5 @@
 using MediatR;
+using TwitterClone.Application.Common;
 using TwitterClone.Application.Common.Interfaces;
 using TwitterClone.Domain.Entities;
 using TwitterClone.Domain.Enums;
@@ -7,6 +8,7 @@ namespace TwitterClone.Application.Tweets.Commands.CreateTweet;
 
 public class CreateTweetCommandHandler(
     ITweetRepository tweetRepository,
+    IUserRepository userRepository,
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUser,
     IImageStorageService imageStorage,
@@ -40,6 +42,7 @@ public class CreateTweetCommandHandler(
         // If this tweet is a reply, notify the parent tweet's author that they were replied to (self-replies
         // are skipped inside the service). The parent was already validated to exist; staged here so the
         // notification commits in the same SaveChanges as the reply. TweetId points at the reply itself.
+        Guid? repliedToAuthorId = null;
         if (tweet.ParentId is Guid parentId)
         {
             var parentAuthorId = await tweetRepository.GetAuthorIdAsync(parentId, cancellationToken);
@@ -47,6 +50,29 @@ public class CreateTweetCommandHandler(
             {
                 await notifications.CreateAsync(
                     recipient, authorId, NotificationType.Reply, tweet.Id, cancellationToken);
+                repliedToAuthorId = recipient;
+            }
+        }
+
+        // Notify each @handle mentioned in the text. The service already skips self-mentions (recipient ==
+        // actor) and de-dups equivalent unread, and unknown handles never resolve to an id — so "@author",
+        // "@nobody" and a repeated "@alice @alice" all behave. We additionally skip the reply's parent author:
+        // a reply that @-mentions the very person it replies to should yield only the Reply, not also a Mention
+        // (the two are different notification types, so the service wouldn't collapse them). TweetId points at
+        // this tweet/reply so the notification can preview it.
+        var mentionedHandles = MentionParser.ExtractHandles(request.Content);
+        if (mentionedHandles.Count > 0)
+        {
+            var mentionedIds = await userRepository.GetIdsByHandlesAsync(mentionedHandles, cancellationToken);
+            foreach (var mentionedId in mentionedIds)
+            {
+                if (mentionedId == repliedToAuthorId)
+                {
+                    continue;
+                }
+
+                await notifications.CreateAsync(
+                    mentionedId, authorId, NotificationType.Mention, tweet.Id, cancellationToken);
             }
         }
 

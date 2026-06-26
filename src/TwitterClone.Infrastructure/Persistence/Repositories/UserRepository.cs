@@ -44,6 +44,25 @@ public class UserRepository(ApplicationDbContext context) : IUserRepository
             .FirstOrDefaultAsync(ct);
     }
 
+    public async Task<IReadOnlyList<Guid>> GetIdsByHandlesAsync(
+        IReadOnlyCollection<string> handles, CancellationToken ct = default)
+    {
+        if (handles.Count == 0)
+        {
+            return [];
+        }
+
+        // Normalise to the canonical form the unique index carries, then match in one IN (...) query.
+        // Contains over a list translates to SQL IN on both Npgsql and SQLite (so the relational test exercises
+        // it). Distinct normalised input collapses casing/@-variants of the same handle before the query.
+        var normalized = handles.Select(HandleNormalizer.Normalize).Distinct().ToList();
+        return await context.Users
+            .AsNoTracking()
+            .Where(u => normalized.Contains(u.NormalizedHandle))
+            .Select(u => u.Id)
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<UserSuggestionDto>> GetSuggestionsAsync(
         Guid currentUserId, int limit, CancellationToken ct = default) =>
         await context.Users

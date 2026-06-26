@@ -23,6 +23,14 @@ public interface IUserRepository
     Task<Guid?> GetIdByHandleAsync(string handle, CancellationToken ct = default);
 
     /// <summary>
+    /// Resolves a batch of handles (case-insensitive, @-tolerant) to the ids of the users that exist, in a
+    /// single query. Unknown handles are simply absent from the result; the ids are distinct. Used to turn the
+    /// <c>@handle</c> mentions parsed from a tweet into notification recipients.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetIdsByHandlesAsync(
+        IReadOnlyCollection<string> handles, CancellationToken ct = default);
+
+    /// <summary>
     /// "Who to follow" suggestions for <paramref name="currentUserId"/>: up to <paramref name="limit"/> users
     /// who are neither the caller nor already followed by them, ordered by follower count (most-followed
     /// first). A single query with correlated counts — no N+1.

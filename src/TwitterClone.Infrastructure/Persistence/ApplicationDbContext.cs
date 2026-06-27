@@ -32,6 +32,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
     public DbSet<Notification> Notifications => Set<Notification>();
 
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+
+    public DbSet<ConversationParticipant> ConversationParticipants => Set<ConversationParticipant>();
+
+    public DbSet<Message> Messages => Set<Message>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Identity's own entity mappings must be applied first (base call),

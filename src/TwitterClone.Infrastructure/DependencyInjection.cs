@@ -34,6 +34,8 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IConversationRepository, ConversationRepository>();
+        services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Notifications (Module 5A): the creation policy (self-skip + unread dedup) lives behind

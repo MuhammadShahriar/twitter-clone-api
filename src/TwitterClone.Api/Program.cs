@@ -38,6 +38,9 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<IUserIdProvider, SubClaimUserIdProvider>();
 builder.Services.AddScoped<INotificationPublisher, NotificationHubPublisher>();
 
+// Real-time direct messages (Module 12B): a second hub + publisher on the same chokepoint/socket-auth as 5B.
+builder.Services.AddScoped<IMessagePublisher, ChatHubPublisher>();
+
 // Refresh-token cookie settings (Module 1C-ii) — bound here because cookie handling is an API concern.
 builder.Services.Configure<AuthCookieSettings>(builder.Configuration.GetSection(AuthCookieSettings.SectionName));
 
@@ -97,6 +100,7 @@ app.MapControllers();
 // Real-time notification hub. After UseAuthentication/UseAuthorization so [Authorize] applies; the CORS
 // policy (AllowCredentials + explicit origins) already set above lets the browser open the cross-site socket.
 app.MapHub<NotificationHub>(NotificationHub.Path);
+app.MapHub<ChatHub>(ChatHub.Path);
 
 // Lightweight liveness endpoint for Render health checks.
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));

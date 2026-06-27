@@ -22,6 +22,9 @@ public interface IUserRepository
     /// <summary>Resolves a handle to its user id (for the follow/unfollow write side), or <c>null</c> if unknown.</summary>
     Task<Guid?> GetIdByHandleAsync(string handle, CancellationToken ct = default);
 
+    /// <summary>True if a user with the given id exists (used to validate a DM recipient given by id).</summary>
+    Task<bool> ExistsAsync(Guid userId, CancellationToken ct = default);
+
     /// <summary>
     /// Resolves a batch of handles (case-insensitive, @-tolerant) to the ids of the users that exist, in a
     /// single query. Unknown handles are simply absent from the result; the ids are distinct. Used to turn the

@@ -221,6 +221,9 @@ public class EngagementRaceTests
         public Task<IReadOnlyList<Guid>> GetIdsByHandlesAsync(IReadOnlyCollection<string> handles, CancellationToken ct = default) =>
             throw new NotImplementedException();
 
+        public Task<bool> ExistsAsync(Guid userId, CancellationToken ct = default) =>
+            throw new NotImplementedException();
+
         public Task<IReadOnlyList<UserSuggestionDto>> GetSuggestionsAsync(Guid currentUserId, int limit, CancellationToken ct = default) =>
             throw new NotImplementedException();
 

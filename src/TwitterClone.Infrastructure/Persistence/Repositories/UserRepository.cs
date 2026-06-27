@@ -44,6 +44,9 @@ public class UserRepository(ApplicationDbContext context) : IUserRepository
             .FirstOrDefaultAsync(ct);
     }
 
+    public async Task<bool> ExistsAsync(Guid userId, CancellationToken ct = default) =>
+        await context.Users.AsNoTracking().AnyAsync(u => u.Id == userId, ct);
+
     public async Task<IReadOnlyList<Guid>> GetIdsByHandlesAsync(
         IReadOnlyCollection<string> handles, CancellationToken ct = default)
     {

@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using TwitterClone.Application.Common.Interfaces;
+using TwitterClone.Application.Conversations;
 using TwitterClone.Application.Notifications;
 using TwitterClone.Domain.Enums;
 using Xunit;
@@ -155,6 +156,8 @@ public class RecordingPublisherWebAppFactory : TestWebAppFactory
 {
     public RecordingNotificationPublisher Publisher { get; } = new();
 
+    public RecordingMessagePublisher Messages { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
@@ -168,8 +171,32 @@ public class RecordingPublisherWebAppFactory : TestWebAppFactory
             }
 
             services.AddSingleton<INotificationPublisher>(Publisher);
+
+            // Swap the SignalR message publisher too (Module 12B) so DM realtime tests can assert pushes.
+            var existingMessages = services.FirstOrDefault(d => d.ServiceType == typeof(IMessagePublisher));
+            if (existingMessages is not null)
+            {
+                services.Remove(existingMessages);
+            }
+
+            services.AddSingleton<IMessagePublisher>(Messages);
         });
     }
+}
+
+/// <summary>Records every DM push the commit chokepoint makes, for assertion in tests (Module 12B).</summary>
+public sealed class RecordingMessagePublisher : IMessagePublisher
+{
+    private readonly ConcurrentQueue<(Guid RecipientId, MessagePushDto Payload)> _pushes = new();
+
+    public Task PublishAsync(Guid recipientId, MessagePushDto payload, CancellationToken ct = default)
+    {
+        _pushes.Enqueue((recipientId, payload));
+        return Task.CompletedTask;
+    }
+
+    public IReadOnlyList<(Guid RecipientId, MessagePushDto Payload)> PushesTo(Guid recipientId) =>
+        _pushes.Where(p => p.RecipientId == recipientId).ToArray();
 }
 
 /// <summary>Records every push the commit chokepoint makes, for assertion in tests.</summary>

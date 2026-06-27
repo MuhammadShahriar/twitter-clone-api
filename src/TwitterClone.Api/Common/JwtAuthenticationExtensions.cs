@@ -41,16 +41,19 @@ public static class JwtAuthenticationExtensions
                 };
 
                 // Browsers can't set the Authorization header on a WebSocket handshake, so SignalR clients
-                // pass the access token in the query string instead. Accept it ONLY for the hub path (REST
+                // pass the access token in the query string instead. Accept it ONLY for the hub paths (REST
                 // endpoints still require the Authorization header — a query-string token there would be a
-                // leak risk, e.g. via logs/referrers).
+                // leak risk, e.g. via logs/referrers). Both hubs share this one rule — adding the chat hub
+                // here rather than forking a second token-extraction mechanism.
                 bearer.Events = new JwtBearerEvents
                 {
                     OnMessageReceived = messageContext =>
                     {
                         var accessToken = messageContext.Request.Query["access_token"];
                         var path = messageContext.HttpContext.Request.Path;
-                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments(NotificationHub.Path))
+                        if (!string.IsNullOrEmpty(accessToken)
+                            && (path.StartsWithSegments(NotificationHub.Path)
+                                || path.StartsWithSegments(ChatHub.Path)))
                         {
                             messageContext.Token = accessToken;
                         }

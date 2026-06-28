@@ -1,5 +1,9 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using TwitterClone.Api.Common;
 using TwitterClone.Api.Hubs;
 using TwitterClone.Application;
@@ -60,6 +64,80 @@ builder.Services.AddCors(options =>
             .AllowCredentials());
 });
 
+// Basic rate limiting (built into ASP.NET Core): a strict per-IP window on the auth endpoints (complements
+// the Identity lockout against brute force) and a looser global window on writes keyed by the authenticated
+// user id. Reads, preflight, health and the SignalR hubs are never throttled. Limits are config-driven and
+// default high enough that normal use never trips them; the test host sets RateLimiting:Enabled=false.
+// Settings are resolved lazily per request (via IOptions) so the effective config — including values the
+// integration test host injects after this point — is honoured (an eager read here would miss them).
+builder.Services.Configure<RateLimitSettings>(builder.Configuration.GetSection(RateLimitSettings.SectionName));
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Surface a Retry-After header when the limiter can tell the client how long to back off.
+    options.OnRejected = (context, _) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)retryAfter.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        return ValueTask.CompletedTask;
+    };
+
+    // Auth endpoints: strict fixed window per client IP (applied via [EnableRateLimiting("auth")]). When the
+    // limiter is disabled (test host) it's a no-op — the middleware must still run so the per-endpoint
+    // [EnableRateLimiting] metadata has a handler.
+    options.AddPolicy(RateLimitPolicies.Auth, httpContext =>
+    {
+        var settings = RateLimits(httpContext);
+        return settings.Enabled
+            ? RateLimitPartition.GetFixedWindowLimiter(
+                ClientIp(httpContext),
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = settings.AuthPermitLimit,
+                    Window = TimeSpan.FromSeconds(settings.WindowSeconds),
+                })
+            : RateLimitPartition.GetNoLimiter("disabled");
+    });
+
+    // Global write limiter: leave reads/preflight/health/hubs unthrottled; cap writes per authenticated user
+    // id (fallback to IP when anonymous, e.g. login/register, which also carry the stricter auth policy).
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var settings = RateLimits(httpContext);
+        var method = httpContext.Request.Method;
+        if (!settings.Enabled
+            || HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method)
+            || httpContext.Request.Path.StartsWithSegments("/hubs"))
+        {
+            return RateLimitPartition.GetNoLimiter("unthrottled");
+        }
+
+        var key = httpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ?? ClientIp(httpContext);
+        return RateLimitPartition.GetFixedWindowLimiter($"write:{key}", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = settings.WritePermitLimit,
+            Window = TimeSpan.FromSeconds(settings.WindowSeconds),
+        });
+    });
+});
+
+static RateLimitSettings RateLimits(HttpContext httpContext) =>
+    httpContext.RequestServices.GetRequiredService<IOptions<RateLimitSettings>>().Value;
+
+// The client IP for partitioning: prefer X-Forwarded-For (Render terminates TLS at a proxy) then the socket.
+static string ClientIp(HttpContext httpContext)
+{
+    var forwarded = httpContext.Request.Headers.TryGetValue("X-Forwarded-For", out var values)
+        ? values.ToString().Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()
+        : null;
+    return forwarded ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+}
+
 // Exception handlers are tried in registration order; each ignores exceptions that aren't its type.
 builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
 builder.Services.AddExceptionHandler<AccountLockedExceptionHandler>();
@@ -94,6 +172,11 @@ app.UseCors(CorsPolicy);
 // principal, then authorization enforces [Authorize] — all before the endpoints run.
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Rate limiting runs after authentication so the write limiter can partition by the authenticated user id,
+// and after routing so the per-endpoint auth policy is in scope. Always wired (the [EnableRateLimiting]
+// endpoints require a handler); the limiters themselves are no-ops when RateLimiting:Enabled is false.
+app.UseRateLimiter();
 
 app.MapControllers();
 

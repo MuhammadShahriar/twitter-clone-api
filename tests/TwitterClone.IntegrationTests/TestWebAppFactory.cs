@@ -44,6 +44,9 @@ public class TestWebAppFactory : WebApplicationFactory<Program>
                 ["Cloudinary:ApiKey"] = "test-key",
                 ["Cloudinary:ApiSecret"] = "test-secret",
                 ["Cloudinary:UploadFolder"] = "tests",
+                // Rate limiting off by default for the suite so existing tests aren't throttled (they all
+                // come from one loopback IP). The dedicated rate-limit tests re-enable it with small limits.
+                ["RateLimiting:Enabled"] = "false",
             });
         });
 

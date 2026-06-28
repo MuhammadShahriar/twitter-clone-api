@@ -73,9 +73,11 @@ public class TweetRepository(ApplicationDbContext context)
             .Select(f => f.FolloweeId);
 
         // Every way a tweet can surface in the feed, each carrying its effective timeline time: a top-level
-        // tweet authored by a followee, or a tweet retweeted by a followee.
+        // tweet authored by a followee OR by the caller themselves (Twitter shows your own posts in your home
+        // timeline), or a tweet retweeted by a followee.
         var authored = Context.Tweets
-            .Where(t => t.ParentId == null && followeeIds.Contains(t.AuthorId))
+            .Where(t => t.ParentId == null
+                && (t.AuthorId == currentUserId || followeeIds.Contains(t.AuthorId)))
             .Select(t => new { TweetId = t.Id, SortTime = t.CreatedAtUtc });
 
         var retweeted = Context.Retweets

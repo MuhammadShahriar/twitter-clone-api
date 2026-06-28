@@ -77,17 +77,17 @@ public class CreateTweetCommandHandler(
 
         // Notify each @handle mentioned in the text. The service already skips self-mentions (recipient ==
         // actor) and de-dups equivalent unread, and unknown handles never resolve to an id — so "@author",
-        // "@nobody" and a repeated "@alice @alice" all behave. We additionally skip the reply's parent author:
-        // a reply that @-mentions the very person it replies to should yield only the Reply, not also a Mention
-        // (the two are different notification types, so the service wouldn't collapse them). TweetId points at
-        // this tweet/reply so the notification can preview it.
+        // "@nobody" and a repeated "@alice @alice" all behave. We additionally skip the reply's parent author
+        // AND the quoted tweet's author: a reply/quote that @-mentions the very person it replies to/quotes
+        // should yield only the Reply/Quote, not also a Mention (different notification types, so the service
+        // wouldn't collapse them). Third-party mentions still notify. TweetId points at this tweet so it previews.
         var mentionedHandles = MentionParser.ExtractHandles(request.Content);
         if (mentionedHandles.Count > 0)
         {
             var mentionedIds = await userRepository.GetIdsByHandlesAsync(mentionedHandles, cancellationToken);
             foreach (var mentionedId in mentionedIds)
             {
-                if (mentionedId == repliedToAuthorId)
+                if (mentionedId == repliedToAuthorId || mentionedId == quotedAuthorId)
                 {
                     continue;
                 }

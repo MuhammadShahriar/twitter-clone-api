@@ -90,6 +90,40 @@ public class QuoteTweetApiTests : IClassFixture<TestWebAppFactory>
     }
 
     [Fact]
+    public async Task Quoting_and_mentioning_the_same_author_yields_only_a_quote_not_a_duplicate_mention()
+    {
+        var client = _factory.CreateClient();
+        var alice = await RegisterAndLoginAsync(client, "@alice_qm1", "Alice");
+        var bob = await RegisterAndLoginAsync(client, "@bob_qm1", "Bob");
+
+        var original = await CreateTweetAsync(client, bob.AccessToken, "Bob's original.");
+
+        // Alice quotes Bob AND @-mentions Bob in the quote text. Bob should get a single Quote, no Mention.
+        await CreateQuoteAsync(client, alice.AccessToken, "great take @bob_qm1", original.Id);
+
+        var bobNotifs = await ListNotificationsAsync(client, bob.AccessToken);
+        Assert.Single(bobNotifs.Items, n => n.Type == "Quote");
+        Assert.DoesNotContain(bobNotifs.Items, n => n.Type == "Mention");
+    }
+
+    [Fact]
+    public async Task A_quote_that_mentions_a_third_party_still_notifies_them()
+    {
+        var client = _factory.CreateClient();
+        var alice = await RegisterAndLoginAsync(client, "@alice_qm2", "Alice");
+        var bob = await RegisterAndLoginAsync(client, "@bob_qm2", "Bob");
+        var carol = await RegisterAndLoginAsync(client, "@carol_qm2", "Carol");
+
+        var original = await CreateTweetAsync(client, bob.AccessToken, "Bob's original.");
+
+        // Alice quotes Bob but mentions Carol (a third party). Bob gets the Quote; Carol gets a Mention.
+        await CreateQuoteAsync(client, alice.AccessToken, "cc @carol_qm2", original.Id);
+
+        Assert.Single((await ListNotificationsAsync(client, bob.AccessToken)).Items, n => n.Type == "Quote");
+        Assert.Single((await ListNotificationsAsync(client, carol.AccessToken)).Items, n => n.Type == "Mention");
+    }
+
+    [Fact]
     public async Task A_quote_must_have_content()
     {
         var client = _factory.CreateClient();

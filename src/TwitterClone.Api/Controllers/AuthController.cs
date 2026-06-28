@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using TwitterClone.Api.Common;
 using TwitterClone.Application.Authentication;
@@ -20,8 +21,10 @@ public class AuthController(ISender mediator, IOptions<AuthCookieSettings> cooki
 
     /// <summary>Registers a new account. Returns the created user; obtain a token via login.</summary>
     [HttpPost("register")]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [ProducesResponseType(typeof(RegisterResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<RegisterResult>> Register(
         [FromBody] RegisterCommand command,
         CancellationToken cancellationToken)
@@ -35,9 +38,11 @@ public class AuthController(ISender mediator, IOptions<AuthCookieSettings> cooki
     /// token in an httpOnly cookie.
     /// </summary>
     [HttpPost("login")]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [ProducesResponseType(typeof(AuthenticationResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<AuthenticationResult>> Login(
         [FromBody] LoginCommand command,
         CancellationToken cancellationToken)

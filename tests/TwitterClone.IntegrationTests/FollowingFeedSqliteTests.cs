@@ -227,6 +227,51 @@ public class FollowingFeedSqliteTests
     }
 
     [Fact]
+    public async Task Following_feed_includes_my_own_tweets_interleaved_by_time()
+    {
+        using var db = new SqliteTestHarness();
+
+        var me = Guid.NewGuid();
+        var followed = Guid.NewGuid();
+        var stranger = Guid.NewGuid(); // not followed, not me — must be absent
+
+        var f1 = Guid.NewGuid();   // followed, @10
+        var mine = Guid.NewGuid();  // MY OWN tweet, @20
+        var s1 = Guid.NewGuid();   // stranger, @25 — excluded
+        var f2 = Guid.NewGuid();   // followed, @30
+
+        await using (var seed = db.NewContext())
+        {
+            seed.Users.AddRange(
+                SqliteTestHarness.NewUser(me, "@me_feed"),
+                SqliteTestHarness.NewUser(followed, "@followed_feed"),
+                SqliteTestHarness.NewUser(stranger, "@stranger_feed"));
+
+            seed.Follows.Add(new Follow(me, followed)); // I follow `followed`, not `stranger`
+
+            seed.Tweets.AddRange(
+                new Tweet("f1", followed) { Id = f1, CreatedAtUtc = At(10) },
+                new Tweet("mine", me) { Id = mine, CreatedAtUtc = At(20) },
+                new Tweet("s1", stranger) { Id = s1, CreatedAtUtc = At(25) },
+                new Tweet("f2", followed) { Id = f2, CreatedAtUtc = At(30) });
+
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = db.NewContext();
+        var repository = new TweetRepository(context);
+
+        var page = await repository.GetFollowingFeedAsync(me, cursor: null, limit: 50);
+
+        // My own tweet appears, interleaved by time between the followed user's tweets; newest-first.
+        Assert.Equal(new[] { f2, mine, f1 }, page.Items.Select(t => t.Id).ToArray());
+        Assert.Contains(page.Items, t => t.Id == mine);
+
+        // A non-followed stranger's tweet (that I didn't author and no followee retweeted) is still excluded.
+        Assert.DoesNotContain(page.Items, t => t.Id == s1);
+    }
+
+    [Fact]
     public async Task Following_feed_is_empty_when_the_user_follows_no_one()
     {
         using var db = new SqliteTestHarness();
